@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador OSP · Fiberlog</title>
+<style>
+:root{color-scheme:light;--navy:#10223d;--navy-deep:#09182e;--gray:#eef2f6;--slate:#52647a;--light:#b8c8da;--white:#fff;--line:#dbe3ec;font-family:Inter,Arial,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--gray);color:var(--navy)}
+a,button{-webkit-tap-highlight-color:transparent}
+a:focus-visible,button:focus-visible{outline:3px solid #5798e5;outline-offset:4px}
+.cover{max-width:1440px;margin:0 auto;padding:clamp(18px,4vw,56px)}
+.masthead{display:flex;align-items:center;gap:16px;padding:0 0 21px;color:#3e5269;font-size:14px;font-weight:700;letter-spacing:.025em}
+.logo{width:127px;height:44px;object-fit:contain;object-position:left center;display:block}
+.masthead span{border-left:1px solid #b8c6d5;padding-left:16px}
+.hero{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);min-height:525px;border-radius:20px;overflow:hidden;background:var(--navy-deep);box-shadow:0 16px 35px #10223d19}
+.intro{position:relative;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:20px;padding:clamp(26px,4.1vw,58px);color:var(--white);background:linear-gradient(135deg,#172f50,var(--navy-deep) 82%)}
+.place{font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:800;color:#c8d9ec;margin:0}
+h1{font-size:clamp(38px,4.5vw,71px);line-height:1.01;letter-spacing:-.058em;max-width:10ch;margin:0}
+.description{max-width:32ch;font-size:clamp(16px,1.5vw,19px);line-height:1.5;color:#d6e1ee;margin:0 0 5px}
+.launch{display:inline-flex;align-items:center;gap:20px;padding:15px 19px;background:#fff;border:1px solid #fff;border-radius:9px;color:var(--navy-deep);font-weight:800;text-decoration:none;transition:background .18s,transform .18s;min-height:52px}
+.launch:hover{background:#dbeaff;transform:translateY(-2px)}
+.launch span{font-size:20px;line-height:1}
+.scene{min-width:0;position:relative;isolation:isolate;margin:0;overflow:hidden;background:#33465d}
+.scene:has(img:not([src])) img,.scene-unavailable img{display:none}
+.scene img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center}
+.scene::after{position:absolute;z-index:0;inset:0;content:"";pointer-events:none;background:linear-gradient(0deg,#041023d9,transparent 38%)}
+.scene figcaption{position:absolute;z-index:1;left:clamp(16px,3vw,29px);bottom:clamp(16px,3vw,26px);right:clamp(16px,3vw,29px);color:#fff}
+.scene figcaption strong{display:block;font-size:clamp(17px,2vw,25px);letter-spacing:-.02em}
+.scene figcaption span{display:block;margin-top:4px;line-height:1.4;color:#f0f5fa}
+.preview{margin-top:22px}
+.preview h2{font-size:15px;margin:0 0 10px}
+.preview-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.preview button{font:inherit;font-size:14px;font-weight:750;color:var(--navy);min-height:45px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 14px;border:1px solid var(--line);border-radius:9px;background:#fff;text-align:left;cursor:pointer;transition:background .18s,border-color .18s,color .18s}
+.preview button::after{content:"›";font-size:22px;line-height:1}
+.preview button:hover{border-color:#54769c;background:#edf5ff}
+.preview button[aria-pressed="true"]{background:var(--navy);color:#fff;border-color:var(--navy)}
+@media(max-width:900px){.hero{min-height:460px}}
+@media(max-width:680px){.hero{grid-template-columns:1fr}.intro{gap:16px}.scene{min-height:clamp(220px,63vw,405px)}.masthead{gap:10px}.masthead span{padding-left:10px}.preview-controls{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important}.launch:hover{transform:none}}
+</style>
+</head>
+<body>
+<main class="cover">
+<header class="masthead">
+  <img class="logo" alt="Fiberlog">
+  <span>Inspección visual OSP</span>
+</header>
+<section class="hero" aria-labelledby="cover-title">
+  <div class="intro">
+    <p class="place">Miami-Dade · Florida</p>
+    <h1 id="cover-title">Explora la ruta OSP</h1>
+    <p class="description">Recorre las calles, selecciona las utilidades visibles y revisa qué evidencia necesitas para identificarlas.</p>
+    <a class="launch" href="https://mtagliaferro21.github.io/simulador-osp-miami/" target="_blank" rel="noopener" aria-label="Iniciar simulador (se abre en otra pestaña)">Iniciar simulador <span aria-hidden="true">↗</span></a>
+  </div>
+  <figure id="vista" class="scene">
+    <img id="scene-image" alt="Calle residencial con una rejilla de drenaje, una tapa de registro y un poste de iluminación.">
+    <figcaption aria-live="polite">
+      <strong id="scene-title">Calle principal</strong>
+      <span id="scene-detail">Drenaje pluvial, tapa de registro y poste de alumbrado.</span>
+    </figcaption>
+  </figure>
+</section>
+<section class="preview" aria-labelledby="preview-title">
+  <h2 id="preview-title">Vista previa del recorrido</h2>
+  <div class="preview-controls" role="group" aria-label="Seleccionar vista de la ruta">
+    <button type="button" data-scene="0" aria-pressed="true" aria-controls="vista">Calle principal</button>
+    <button type="button" data-scene="1" aria-pressed="false" aria-controls="vista">Intersección</button>
+    <button type="button" data-scene="2" aria-pressed="false" aria-controls="vista">Calle lateral</button>
+  </div>
+</section>
+</main>
+<script>
+"use strict";
+const logo = document.querySelector(".logo");
+const photo = document.querySelector("#scene-image");
+const title = document.querySelector("#scene-title");
+const detail = document.querySelector("#scene-detail");
+const buttons = Array.from(document.querySelectorAll("[data-scene]"));
+const scenes = [
+  { id: "foto-2", title: "Calle principal", alt: photo.alt,
+    detail: "Drenaje pluvial, tapa de registro y poste de alumbrado." },
+  { id: "vista-cruce", title: "Intersección",
+    alt: "Intersección residencial donde se gira hacia la calle de la derecha.",
+    detail: "Gira a la derecha para continuar hacia la calle lateral." },
+  { id: "vista-lateral", title: "Calle lateral",
+    alt: "Calle con hidrante, tapa sanitaria, transformador y pedestal de telecomunicaciones.",
+    detail: "Agua potable, alcantarillado sanitario, Power y Telecom." },
+];
+
+let assets;
+let active = 0;
+
+function showScene(index) {
+  active = index;
+  const scene = scenes[index];
+  photo.alt = scene.alt;
+  title.textContent = scene.title;
+  detail.textContent = scene.detail;
+  buttons.forEach((button, i) => button.setAttribute("aria-pressed", String(i === index)));
+  if (assets) photo.src = assets.get(scene.id);
+}
+
+buttons.forEach((button, index) => button.addEventListener("click", () => showScene(index)));
+
+// Las imágenes se leen del HTML del recorrido. El botón de inicio
+// siempre permanece disponible, incluso si la vista previa falla.
+async function loadAssets() {
+  const response = await fetch("./index.html");
+  if (!response.ok) throw new Error("No se pudo cargar el simulador");
+  const simulator = new DOMParser().parseFromString(await response.text(), "text/html");
+  const ids = ["foto-1", ...scenes.map(scene => scene.id)];
+  assets = new Map(ids.map(id => {
+    const image = simulator.getElementById(id)?.textContent.trim();
+    if (!/^data:image\/(png|webp);base64,/.test(image ?? "")) throw new Error("Imagen ausente");
+    return [id, image];
+  }));
+  logo.src = assets.get("foto-1");
+  showScene(active);
+}
+
+loadAssets().catch(() => {
+  photo.hidden = true;
+  document.querySelector(".scene").classList.add("scene-unavailable");
+});
+</script>
+</body>
+</html>
