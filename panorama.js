@@ -1,8 +1,6 @@
 "use strict";
 
-window.createStreetPanorama = function createStreetPanorama(canvas, pins, src, onReady) {
-  const gl = canvas.getContext("webgl", { alpha: false, antialias: false });
-  if (!gl) return null;
+function createPanoramaGraphics(gl) {
   const vertex = "attribute vec2 p; varying vec2 uv; void main(){uv=p;gl_Position=vec4(p,0.,1.);}";
   const fragment = `
     precision highp float;
@@ -48,6 +46,84 @@ window.createStreetPanorama = function createStreetPanorama(canvas, pins, src, o
   const spread = gl.getUniformLocation(program, "spread");
   const turn = gl.getUniformLocation(program, "turn");
 
+  return {
+    density: (width) => Math.min(window.devicePixelRatio || 1, 2, 1800 / width),
+    load(image) {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    },
+    draw(width, height, halfWidth, halfHeight, yaw, pitch) {
+      gl.viewport(0, 0, width, height);
+      gl.uniform2f(spread, halfWidth, halfHeight);
+      gl.uniform2f(turn, yaw, pitch);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    },
+    dispose() {
+      gl.deleteTexture(texture);
+      gl.deleteBuffer(buffer);
+      shaders.forEach(shader => gl.deleteShader(shader));
+      gl.deleteProgram(program);
+      gl.getExtension("WEBGL_lose_context")?.loseContext();
+    },
+  };
+}
+
+function createPanoramaSoftware(context) {
+  let texture;
+  let textureWidth;
+  let textureHeight;
+  let frame;
+  let rays;
+  return {
+    density: (width, height) => Math.min(1, 800 / width, 480 / height),
+    load(image) {
+      const source = document.createElement("canvas");
+      textureWidth = source.width = image.naturalWidth;
+      textureHeight = source.height = image.naturalHeight;
+      const sourceContext = source.getContext("2d", { willReadFrequently: true });
+      sourceContext.drawImage(image, 0, 0);
+      texture = new Uint32Array(sourceContext.getImageData(0, 0, textureWidth, textureHeight).data.buffer);
+    },
+    draw(width, height, halfWidth, halfHeight, yaw, pitch) {
+      if (!frame || frame.width !== width || frame.height !== height) {
+        frame = context.createImageData(width, height);
+        rays = new Float32Array(width * height * 3);
+        let i = 0;
+        for (let row = 0; row < height; row++) {
+          const y = (1 - (row + .5) * 2 / height) * halfHeight;
+          for (let column = 0; column < width; column++) {
+            const x = ((column + .5) * 2 / width - 1) * halfWidth;
+            const inv = 1 / Math.sqrt(x * x + y * y + 1);
+            rays[i++] = x * inv;
+            rays[i++] = y * inv;
+            rays[i++] = inv;
+          }
+        }
+      }
+      const result = new Uint32Array(frame.data.buffer);
+      const cp = Math.cos(pitch), sp = Math.sin(pitch);
+      const longitudeScale = textureWidth / (2 * Math.PI);
+      const latitudeScale = textureHeight / Math.PI;
+      const yawOffset = textureWidth / 2 + yaw * longitudeScale;
+      for (let j = 0, i = 0; j < result.length; j++, i += 3) {
+        const y = rays[i + 1], z = rays[i + 2];
+        const longitude = Math.atan2(rays[i], cp * z - sp * y);
+        const latitude = Math.asin(Math.max(-1, Math.min(1, cp * y + sp * z)));
+        const sx = ((Math.floor(yawOffset + longitude * longitudeScale) % textureWidth) + textureWidth) % textureWidth;
+        const sy = Math.min(textureHeight - 1, Math.floor(textureHeight / 2 - latitude * latitudeScale));
+        result[j] = texture[sy * textureWidth + sx];
+      }
+      context.putImageData(frame, 0, 0);
+    },
+    dispose() { texture = null; frame = null; rays = null; },
+  };
+}
+
+window.createStreetPanorama = function createStreetPanorama(canvas, pins, src, onReady) {
+  const gl = canvas.getContext("webgl", { alpha: false, antialias: false });
+  const context = gl ? null : canvas.getContext("2d", { alpha: false });
+  const renderer = gl ? createPanoramaGraphics(gl) : context ? createPanoramaSoftware(context) : null;
+  if (!renderer) return null;
+
   // Each asset is anchored to a longitude and latitude on the panorama.
   const tau = 2 * Math.PI;
   const anchors = pins.map(element => {
@@ -68,7 +144,7 @@ window.createStreetPanorama = function createStreetPanorama(canvas, pins, src, o
     if (!loaded || disposed) return;
     const width = canvas.clientWidth, height = canvas.clientHeight;
     if (!width || !height) return;
-    const density = Math.min(window.devicePixelRatio || 1, 2, 1800 / width);
+    const density = renderer.density(width, height);
     const pixelWidth = Math.round(width * density), pixelHeight = Math.round(height * density);
     if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
       canvas.width = pixelWidth;
@@ -77,10 +153,7 @@ window.createStreetPanorama = function createStreetPanorama(canvas, pins, src, o
     const aspect = width / height;
     const halfWidth = Math.min(Math.tan(51 * Math.PI / 180), .77 * aspect);
     const halfHeight = halfWidth / aspect;
-    gl.viewport(0, 0, pixelWidth, pixelHeight);
-    gl.uniform2f(spread, halfWidth, halfHeight);
-    gl.uniform2f(turn, yaw, pitch);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    renderer.draw(pixelWidth, pixelHeight, halfWidth, halfHeight, yaw, pitch);
 
     const cy = Math.cos(yaw), sy = Math.sin(yaw);
     const cp = Math.cos(pitch), sp = Math.sin(pitch);
@@ -106,10 +179,15 @@ window.createStreetPanorama = function createStreetPanorama(canvas, pins, src, o
   }
   image.onload = () => {
     if (disposed) return;
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-    loaded = true;
-    onReady(true);
-    draw();
+    try {
+      renderer.load(image);
+      loaded = true;
+      onReady(true);
+      draw();
+    } catch (error) {
+      console.warn("No se pudo preparar el panorama", error);
+      onReady(false);
+    }
   };
   image.onerror = () => { if (!disposed) onReady(false); };
   canvas.addEventListener("webglcontextlost", () => { if (!disposed) onReady(false); });
@@ -119,11 +197,7 @@ window.createStreetPanorama = function createStreetPanorama(canvas, pins, src, o
     dispose() {
       disposed = true;
       cancelAnimationFrame(scheduled);
-      gl.deleteTexture(texture);
-      gl.deleteBuffer(buffer);
-      shaders.forEach(shader => gl.deleteShader(shader));
-      gl.deleteProgram(program);
-      gl.getExtension("WEBGL_lose_context")?.loseContext();
+      renderer.dispose();
     },
   };
 };
