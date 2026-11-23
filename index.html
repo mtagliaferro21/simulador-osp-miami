@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="es">
+<html lang="en-US">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Simulador OSP · Miami-Dade</title>
+<title>OSP Simulator · Miami-Dade</title>
 <style>
 body { margin: 0; }
 .md-simulator{min-height:100vh;min-height:100dvh;background:#f3f7fa;color:#0b2545;font:16px/1.5 system-ui,sans-serif}
@@ -93,15 +93,15 @@ body { margin: 0; }
 <main id="recorrido" class="md-simulator">
   <header class="md-header">
     <img alt="Fiberlog">
-    <span>Inspección visual OSP</span>
+    <span>OSP Visual Inspection</span>
     <span class="md-progress" role="status"></span>
   </header>
   <section class="md-content"></section>
   <dialog class="md-utility-dialog" aria-labelledby="md-utility-title"></dialog>
-  <noscript>Activa JavaScript en el navegador para abrir el recorrido.</noscript>
+  <noscript>Enable JavaScript to open the inspection route.</noscript>
 </main>
 
-<!-- Imágenes incorporadas. El archivo funciona también sin conexión. -->
+
 
 
 
@@ -117,11 +117,11 @@ body { margin: 0; }
 window.addEventListener("DOMContentLoaded", async () => {
   try {
     const response = await fetch("./datos/escenas.html");
-    if (!response.ok) throw new Error("Escenas no disponibles");
+    if (!response.ok) throw new Error("Scene assets unavailable");
     const source = new DOMParser().parseFromString(await response.text(), "text/html");
     for (const id of ["foto-1", "foto-2", "foto-3", "foto-4", "foto-5", "foto-6", "vista-media", "vista-cruce", "vista-lateral"]) {
       const data = source.getElementById(id)?.textContent.trim();
-      if (!/^data:image\/(png|webp);base64,/.test(data ?? "")) throw new Error("Imagen ausente");
+      if (!/^data:image\/(png|webp);base64,/.test(data ?? "")) throw new Error("Image asset missing");
       const item = document.createElement("script");
       item.type = "text/plain";
       item.id = id;
@@ -130,7 +130,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
     startSimulator();
   } catch (error) {
-    document.querySelector(".md-content").textContent = "No se pudieron cargar las escenas. Recarga la página para volver a intentarlo.";
+    document.querySelector(".md-content").textContent = "The scenes could not be loaded. Reload the page to try again.";
     console.error(error);
   }
 });
@@ -142,89 +142,89 @@ const street = document.getElementById("foto-2").textContent.trim();
 
 const stops = [
   {
-    id: "DR-01", title: "Drenaje pluvial", photo: document.getElementById("foto-3").textContent.trim(),
-    alt: "Rejilla de drenaje pluvial al ras de la cuneta, junto al bordillo.",
-    observation: "La rejilla junto al bordillo indica una entrada de drenaje visible.",
-    question: "¿Qué información permite evaluar un cruce subterráneo junto a esta entrada?",
-    choices: ["La posición aproximada de la rejilla.", "El trazado, las dimensiones y las cotas de invert de la conducción.", "El ancho visible del pavimento."],
-    correct: 1, feedback: "Solicita el trazado, las dimensiones y las cotas de invert pertinentes al cruce. Con esos datos podrás revisar la separación.",
-    action: "Solicitar planos de drenaje y verificar el cruce.",
+    id: "DR-01", title: "Stormwater", photo: document.getElementById("foto-3").textContent.trim(),
+    alt: "Storm drain grate flush with the gutter next to the curb.",
+    observation: "The grate next to the curb identifies a visible stormwater inlet.",
+    question: "What information is needed to assess an underground crossing near this inlet?",
+    choices: ["The approximate location of the grate.", "The pipe alignment, dimensions, and invert elevations.", "The visible pavement width."],
+    correct: 1, feedback: "Request the pipe alignment, dimensions, and invert elevations at the crossing. Use those records to evaluate utility clearance.",
+    action: "Request stormwater drawings and verify the crossing.",
   },
   {
-    id: "HH-01", title: "Posible handhole", photo: document.getElementById("foto-4").textContent.trim(),
-    alt: "Tapa rectangular de registro cerrada, al ras de la franja verde.",
-    observation: "Se observa una tapa rectangular sin identificación legible.",
-    question: "¿Cómo registrarías esta estructura en el inventario preliminar?",
-    choices: ["Registro de telecomunicaciones con capacidad disponible.", "Punto autorizado para conexión OSP.", "Posible handhole, con servicio, ID y titular por confirmar."],
-    correct: 2, feedback: "Registra la tapa como posible handhole. Confirma el ID, el titular, el servicio y las conexiones con documentación del operador.",
-    action: "Consultar el inventario y los planos del operador.",
+    id: "HH-01", title: "Potential Handhole", photo: document.getElementById("foto-4").textContent.trim(),
+    alt: "Closed rectangular access cover flush with the grass verge.",
+    observation: "A rectangular access cover is visible, with no legible identification.",
+    question: "How should this structure be recorded in the preliminary asset inventory?",
+    choices: ["Telco handhole with available capacity.", "Authorized OSP connection point.", "Potential handhole. Verify the utility type, asset ID, and owner."],
+    correct: 2, feedback: "Record it as a potential handhole. Confirm the asset ID, owner, utility type, and connections against the operator’s records.",
+    action: "Review the operator’s asset inventory and drawings.",
   },
   {
-    id: "TR-01", title: "Árbol", photo: document.getElementById("foto-5").textContent.trim(),
-    alt: "Árbol con tronco y copa visibles en la franja entre la acera y la calzada.",
-    observation: "El tronco está en la franja verde contigua a la acera.",
-    question: "¿Qué debes verificar antes de ubicar una excavación junto al árbol?",
-    choices: ["La zona de protección del árbol y los requisitos aplicables.", "Solo el diámetro visible del tronco.", "La distancia hasta la sombra de la copa."],
-    correct: 0, feedback: "Verifica la zona de protección y los requisitos aplicables antes de definir la huella de excavación.",
-    action: "Confirmar la zona de protección y revisar la huella de trabajo.",
+    id: "TR-01", title: "Tree", photo: document.getElementById("foto-5").textContent.trim(),
+    alt: "Tree with visible trunk and canopy in the verge between the sidewalk and roadway.",
+    observation: "The tree trunk is in the grass verge next to the sidewalk.",
+    question: "What should you verify before laying out an excavation next to the tree?",
+    choices: ["The tree protection zone and applicable requirements.", "The visible trunk diameter alone.", "The distance to the edge of the canopy’s shadow."],
+    correct: 0, feedback: "Verify the tree protection zone and applicable requirements before defining the excavation footprint.",
+    action: "Confirm the tree protection zone and review the work envelope.",
   },
   {
-    id: "LT-01", title: "Poste de iluminación", photo: document.getElementById("foto-6").textContent.trim(),
-    alt: "Poste vial con base visible, brazo curvo y luminaria.",
-    observation: "Se observan la base del poste, el brazo y la luminaria.",
-    question: "¿Qué evidencia necesitas para considerar este poste como apoyo OSP?",
-    choices: ["Una fotografía de la luminaria.", "La identificación, el titular, los requisitos técnicos y la autorización de uso.", "La cercanía del poste a la ruta preliminar."],
-    correct: 1, feedback: "Identifica el activo y confirma el titular. Solicita los requisitos técnicos y la autorización antes de considerarlo como apoyo OSP.",
-    action: "Consultar al titular y solicitar los requisitos de uso.",
+    id: "LT-01", title: "Streetlight Pole", photo: document.getElementById("foto-6").textContent.trim(),
+    alt: "Streetlight pole with a visible base, curved mast arm, and luminaire.",
+    observation: "The pole base, mast arm, and luminaire are visible.",
+    question: "What evidence is needed before considering this pole for an OSP attachment?",
+    choices: ["A photograph of the luminaire.", "The asset ID, owner, technical requirements, and attachment authorization.", "The pole’s proximity to the preliminary route."],
+    correct: 1, feedback: "Identify the asset and confirm its owner. Request the technical requirements and authorization before considering it for an OSP attachment.",
+    action: "Contact the owner and request the attachment requirements.",
   },
 ];
-  // Clasificaciones del ejercicio. Las fichas describen la escena y la evidencia por verificar.
+  // Utility types and supporting evidence used in the training exercise.
   const utilities = {
     drain: {
-      title: "Sumidero pluvial", service: "Drenaje pluvial", mark: "PLUV", color: "#315169", exercise: 0,
-      visible: "Rejilla junto al bordillo que recoge escorrentía de la calle.",
-      evidence: "Consulta el inventario de drenaje para confirmar la conexión, el trazado y las cotas.",
+      title: "Storm Drain Inlet", service: "Stormwater", mark: "STORM", color: "#315169", exercise: 0,
+      visible: "A grate next to the curb collects roadway runoff.",
+      evidence: "Check the stormwater asset inventory to confirm the connection, pipe alignment, and elevations.",
     },
     cover: {
-      title: "Tapa de registro", service: "Servicio por confirmar", mark: "REG", color: "#475569", exercise: 1,
-      visible: "Tapa rectangular de un posible handhole. La marca de la tapa no se distingue.",
-      evidence: "Compara la identificación del registro con los planos o con el inventario del operador.",
+      title: "Access Cover", service: "Utility Type Unverified", mark: "UNK", color: "#475569", exercise: 1,
+      visible: "Rectangular cover consistent with a handhole. The cover marking is illegible.",
+      evidence: "Check the access structure’s identification against the operator’s drawings or asset inventory.",
     },
     light: {
-      title: "Poste de alumbrado", service: "Power · Alumbrado vial", mark: "PWR", color: "#865200", exercise: 3,
-      visible: "Poste con brazo y luminaria para iluminar la calle.",
-      evidence: "El alumbrado forma parte de la red eléctrica de este ejercicio. Verifica la placa, el titular y la autorización antes de considerar un uso OSP.",
+      title: "Streetlight Pole", service: "Power · Street Lighting", mark: "POWER", color: "#865200", exercise: 3,
+      visible: "Pole with a mast arm and luminaire for roadway lighting.",
+      evidence: "The exercise identifies this pole as a street lighting asset. Verify the asset tag, owner, and attachment authorization before considering it for OSP use.",
     },
     hydrant: {
-      title: "Hidrante", service: "Agua potable", mark: "AGUA", color: "#075985",
-      visible: "Hidrante de superficie en la franja verde, a la izquierda de la calle.",
-      evidence: "El inventario del ejercicio lo vincula a la red de agua potable. Para un levantamiento real, solicita el identificador y el plano de la red.",
+      title: "Fire Hydrant", service: "Water · Potable Water", mark: "WATER", color: "#075985",
+      visible: "Aboveground hydrant in the grass verge on the left side of the street.",
+      evidence: "The exercise inventory links this hydrant to the potable water system. For field verification, request the asset ID and water system drawings.",
     },
     sewer: {
-      title: "Pozo de inspección sanitario", service: "Aguas servidas · Alcantarillado sanitario", mark: "SAN", color: "#6b3b79",
-      visible: "Tapa circular al ras de la calzada que da acceso al pozo de inspección.",
-      evidence: "En este ejercicio, el inventario identifica la tapa como sanitaria. En campo, comprueba el identificador y la red en la documentación del operador.",
+      title: "Sanitary Sewer Manhole", service: "Sewer · Sanitary Sewer", mark: "SEWER", color: "#6b3b79",
+      visible: "Round manhole cover flush with the roadway.",
+      evidence: "The exercise inventory identifies this as a sanitary sewer manhole. In the field, verify its asset ID and system classification against the operator’s records.",
     },
     transformer: {
-      title: "Transformador en pedestal", service: "Power · Energía eléctrica", mark: "PWR", color: "#865200",
-      visible: "Gabinete verde sobre una base junto a la acera. Aloja un transformador de distribución en esta escena.",
-      evidence: "Verifica el número de activo y el titular en el inventario eléctrico.",
+      title: "Pad-Mounted Transformer", service: "Power · Electric Distribution", mark: "POWER", color: "#865200",
+      visible: "Green enclosure on a pad next to the sidewalk. This enclosure houses a distribution transformer in the exercise.",
+      evidence: "Verify the asset number and owner in the power utility’s asset inventory.",
     },
     telecom: {
-      title: "Pedestal de telecomunicaciones", service: "Telecom · Telecomunicaciones", mark: "TEL", color: "#146052",
-      visible: "Pedestal vertical junto a la acera para conexiones de una red de telecomunicaciones.",
-      evidence: "El inventario del ejercicio confirma el servicio. En campo, revisa la etiqueta del titular y solicita los planos para confirmar conexiones y ductos.",
+      title: "Telco Pedestal", service: "Telco · Telecommunications", mark: "TELCO", color: "#146052",
+      visible: "Aboveground pedestal next to the sidewalk that provides access to telecommunications connections.",
+      evidence: "The exercise inventory confirms the utility type. In the field, check the owner’s label and request drawings to verify connections and duct routes.",
     },
   };
 
-  // Posiciones de cámara y marcadores. x e y se expresan en porcentaje de cada imagen.
+  // Camera positions and marker coordinates as percentages of each image.
   const viewpoints = [
-    { photo: street, name: "Calle principal", alt: "Inicio de la calle principal junto a la rejilla, la tapa y el poste.",
+    { photo: street, name: "Main Street", alt: "Start of the main street next to the storm drain inlet, access cover, and streetlight pole.",
       assets: [["drain", 44, 86], ["cover", 71, 82], ["light", 38, 43]] },
-    { photo: document.getElementById("vista-media").textContent.trim(), name: "Calle principal", alt: "Tramo intermedio de la calle principal, junto al poste de alumbrado.",
+    { photo: document.getElementById("vista-media").textContent.trim(), name: "Main Street", alt: "Midblock view on the main street next to the streetlight pole.",
       assets: [["light", 79, 83]] },
-    { photo: document.getElementById("vista-cruce").textContent.trim(), name: "Intersección", alt: "Intersección con una calle residencial a la derecha.", assets: [] },
-    { photo: document.getElementById("vista-lateral").textContent.trim(), name: "Calle lateral", alt: "Calle lateral con un hidrante, una tapa sanitaria, un transformador y un pedestal de telecomunicaciones.",
+    { photo: document.getElementById("vista-cruce").textContent.trim(), name: "Intersection", alt: "Intersection with a residential side street on the right.", assets: [] },
+    { photo: document.getElementById("vista-lateral").textContent.trim(), name: "Side Street", alt: "Side street with a fire hydrant, sanitary sewer manhole, transformer, and telco pedestal.",
       assets: [["hydrant", 19.3, 51.7], ["sewer", 47.8, 73.5], ["transformer", 70.8, 45.4], ["telecom", 80.5, 56.1]] },
   ];
   const panoramas = ["principal", "tramo", "interseccion", "lateral"];
@@ -257,20 +257,20 @@ const stops = [
   function overview() {
     const pins = stops.map((stop, index) =>
       `<button type="button" class="md-pin md-pin-${index}" data-open="${index}"
-        aria-label="${escapeHtml("Abrir " + stop.id + " · " + stop.title)}">${index + 1}</button>`).join("");
+        aria-label="${escapeHtml("Open " + stop.id + " · " + stop.title)}">${index + 1}</button>`).join("");
     const menu = stops.map((stop, index) => `
       <button type="button" class="md-stop-link" data-open="${index}">
         <span>${escapeHtml(stop.id + " · " + stop.title)}</span>
-        <span class="md-status">${stop.id in state.answers ? "Respondida" : "Explorar"}</span>
+        <span class="md-status">${stop.id in state.answers ? "Answered" : "Explore"}</span>
       </button>`).join("");
-    return `<h1 tabindex="-1">Ruta residencial · Miami-Dade</h1>
-      <p>Selecciona una parada para observar el elemento y decidir qué información debes verificar.</p>
+    return `<h1 tabindex="-1">Residential Inspection Route · Miami-Dade</h1>
+      <p>Select an inspection stop to observe the asset and determine what information needs verification.</p>
       <div class="md-grid">
-        ${image(street, "Calle residencial con drenaje, tapa de registro, árbol y poste de iluminación.", "Vista general · recreación didáctica", pins)}
+        ${image(street, "Residential street with a storm drain inlet, access cover, tree, and streetlight pole.", "Route Overview · Training Simulation", pins)}
         <div class="md-panel md-stops">
-          <button type="button" class="md-primary" data-view="street">Entrar a la vista de calle</button>
+          <button type="button" class="md-primary" data-view="street">Enter Street View</button>
           ${menu}
-          <button type="button" class="md-primary" data-view="summary" ${Object.keys(state.answers).length === stops.length ? "" : "disabled"}>Ver resumen</button>
+          <button type="button" class="md-primary" data-view="summary" ${Object.keys(state.answers).length === stops.length ? "" : "disabled"}>View Summary</button>
         </div>
       </div>`;
   }
@@ -283,13 +283,13 @@ const stops = [
     const pins = current.assets.map(([id, x, y]) => {
       const asset = utilities[id];
       return `<button type="button" class="md-utility-pin" style="left:${x}%;top:${y}%;--utility-color:${asset.color}"
-        data-utility="${id}" aria-label="${escapeHtml("Identificar " + asset.title)}">${asset.mark}</button>`;
+        data-utility="${id}" aria-label="${escapeHtml("Identify " + asset.title)}">${asset.mark}</button>`;
     }).join("");
     const panoramaPins = panoramaAssets[state.viewpoint].map(([id, x, y]) => {
       const asset = utilities[id];
       return `<button type="button" class="md-utility-pin" style="--utility-color:${asset.color}"
         data-utility="${id}" data-photo-x="${x}" data-photo-y="${y}"
-        aria-label="${escapeHtml("Identificar " + asset.title)}" hidden>${asset.mark}</button>`;
+        aria-label="${escapeHtml("Identify " + asset.title)}" hidden>${asset.mark}</button>`;
     }).join("");
     const utilityLinks = current.assets.map(([id]) => {
       const asset = utilities[id];
@@ -298,28 +298,28 @@ const stops = [
     }).join("");
     const activities = stops.map((stop, index) => `
       <button class="md-secondary" type="button" data-open="${index}">${escapeHtml(stop.title)}${stop.id in state.answers ? " ✓" : ""}</button>`).join("");
-    return `<div class="md-street-head"><h1 tabindex="-1">Vista de calle 360°</h1>
-      <button class="md-secondary" type="button" data-view="overview">Vista general</button></div>
-      <p id="md-street-guide">Arrastra para girar 360° o mirar arriba y abajo. Usa las flechas de la ruta para avanzar y toca los marcadores para identificar las utilidades.</p>
+    return `<div class="md-street-head"><h1 tabindex="-1">360° Street View</h1>
+      <button class="md-secondary" type="button" data-view="overview">Overview</button></div>
+      <p id="md-street-guide">Drag to rotate 360° or look up and down. Use the route arrows to move between viewpoints and select markers to identify utilities.</p>
       <div class="md-street-layout">
-        <div class="md-street-camera" data-point="${state.viewpoint}" tabindex="0" role="group" aria-label="Visor de la ruta" aria-describedby="md-street-guide md-street-point">
+        <div class="md-street-camera" data-point="${state.viewpoint}" tabindex="0" role="group" aria-label="Route Viewer" aria-describedby="md-street-guide md-street-point">
           <div class="md-street-world"><img draggable="false" src="${current.photo}" alt="${escapeHtml(current.alt)}">${pins}</div>
           <div class="md-pano-layer" hidden>
-            <canvas role="img" aria-label="${escapeHtml("Panorama de 360 grados. " + current.alt)}"></canvas>${panoramaPins}
+            <canvas role="img" aria-label="${escapeHtml("360-degree panorama. " + current.alt)}"></canvas>${panoramaPins}
           </div>
           ${last ? "" : `<button class="md-street-arrow" type="button" data-move="1"
-            aria-label="${turning ? "Girar a la derecha" : "Avanzar por la calle"}">${turning ? "↱" : "↑"}</button>`}
-          <span class="md-street-caption">Recreación didáctica</span>
+            aria-label="${turning ? "Turn Right" : "Advance Along Street"}">${turning ? "↱" : "↑"}</button>`}
+          <span class="md-street-caption">Training Simulation</span>
         </div>
         <div class="md-street-bar">
-          <button class="md-secondary" type="button" data-move="-1" ${first ? "disabled" : ""}>← Retroceder</button>
-          <span class="md-street-index" id="md-street-point" role="status">Punto ${state.viewpoint + 1} de ${viewpoints.length} · ${escapeHtml(current.name)}</span>
-          <button class="md-secondary" type="button" data-move="1" ${last ? "disabled" : ""}>${turning ? "Girar a la derecha ↱" : "Avanzar →"}</button>
-          <button class="md-secondary" type="button" data-center>Recentrar vista</button>
+          <button class="md-secondary" type="button" data-move="-1" ${first ? "disabled" : ""}>← Previous</button>
+          <span class="md-street-index" id="md-street-point" role="status">Viewpoint ${state.viewpoint + 1} of ${viewpoints.length} · ${escapeHtml(current.name)}</span>
+          <button class="md-secondary" type="button" data-move="1" ${last ? "disabled" : ""}>${turning ? "Turn Right ↱" : "Next →"}</button>
+          <button class="md-secondary" type="button" data-center>Reset View</button>
         </div>
-        ${utilityLinks ? `<div class="md-utility-links" role="group" aria-label="Utilidades visibles">${utilityLinks}</div>` : ""}
-        <div class="md-street-activities" aria-label="Paradas de inspección" role="group">${activities}
-          ${Object.keys(state.answers).length === stops.length ? '<button class="md-primary" type="button" data-view="summary">Ver resumen</button>' : ""}
+        ${utilityLinks ? `<div class="md-utility-links" role="group" aria-label="Visible Utilities">${utilityLinks}</div>` : ""}
+        <div class="md-street-activities" aria-label="Inspection Stops" role="group">${activities}
+          ${Object.keys(state.answers).length === stops.length ? '<button class="md-primary" type="button" data-view="summary">View Summary</button>' : ""}
         </div>
       </div>`;
   }
@@ -328,11 +328,11 @@ const stops = [
     const asset = utilities[id];
     utilityDialog.innerHTML = `<div class="md-utility-top">
       <span class="md-utility-badge" style="--utility-color:${asset.color}">${escapeHtml(asset.service)}</span>
-      <button type="button" class="md-utility-close" data-close-utility aria-label="Cerrar ficha" autofocus>×</button>
+      <button type="button" class="md-utility-close" data-close-utility aria-label="Close Asset Card" autofocus>×</button>
       </div><h2 id="md-utility-title">${escapeHtml(asset.title)}</h2>
-      <dl><dt>Qué se observa</dt><dd>${escapeHtml(asset.visible)}</dd>
-      <dt>Evidencia</dt><dd>${escapeHtml(asset.evidence)}</dd></dl>
-      ${asset.exercise === undefined ? "" : `<button type="button" class="md-primary" data-open="${asset.exercise}">Ir a la pregunta</button>`}`;
+      <dl><dt>Visual Observation</dt><dd>${escapeHtml(asset.visible)}</dd>
+      <dt>Evidence to Verify</dt><dd>${escapeHtml(asset.evidence)}</dd></dl>
+      ${asset.exercise === undefined ? "" : `<button type="button" class="md-primary" data-open="${asset.exercise}">Go to Question</button>`}`;
     utilityDialog.showModal();
   }
 
@@ -365,11 +365,11 @@ const stops = [
   }
 
   function descent(stop) {
-    return `<h1 tabindex="-1">Acercamiento · ${escapeHtml(stop.title)}</h1>
+    return `<h1 tabindex="-1">Close-up · ${escapeHtml(stop.title)}</h1>
       <figure class="md-viewer md-transition md-target-${state.active}">
-        <img src="${street}" alt="Vista general de la calle antes de abrir el detalle.">
+        <img src="${street}" alt="Street overview before opening the close-up view.">
       </figure>
-      <button type="button" class="md-secondary" data-view="stop">Saltar animación</button>`;
+      <button type="button" class="md-secondary" data-view="stop">Skip Animation</button>`;
   }
 
   function stopView(stop) {
@@ -382,14 +382,14 @@ const stops = [
       </label>`).join("");
     const feedback = answered ? `
       <div class="md-feedback" tabindex="-1">
-        <strong>${answer === stop.correct ? "Respuesta correcta" : "Revisa la evidencia necesaria"}</strong>
+        <strong>${answer === stop.correct ? "Correct Answer" : "Review the Required Evidence"}</strong>
         <p>${escapeHtml(stop.feedback)}</p>
       </div>
-      <button type="button" class="md-primary" data-next>${Object.keys(state.answers).length === stops.length ? "Ver resumen" : "Siguiente parada pendiente"}</button>` : "";
-    return `<button type="button" class="md-back" data-view="${state.backTo}">${state.backTo === "street" ? "← Volver a la calle" : "← Vista general"}</button>
+      <button type="button" class="md-primary" data-next>${Object.keys(state.answers).length === stops.length ? "View Summary" : "Next Unanswered Stop"}</button>` : "";
+    return `<button type="button" class="md-back" data-view="${state.backTo}">${state.backTo === "street" ? "← Back to Street View" : "← Overview"}</button>
       <h1 tabindex="-1">${escapeHtml(stop.id + " · " + stop.title)}</h1>
       <div class="md-grid">
-        ${image(stop.photo, stop.alt, "Detalle · recreación didáctica")}
+        ${image(stop.photo, stop.alt, "Close-up · Training Simulation")}
         <div class="md-panel">
           <p>${escapeHtml(stop.observation)}</p>
           <form>
@@ -397,7 +397,7 @@ const stops = [
               <legend>${escapeHtml(stop.question)}</legend>
               ${choices}
             </fieldset>
-            ${answered ? "" : '<button type="submit" class="md-primary" disabled>Comprobar respuesta</button>'}
+            ${answered ? "" : '<button type="submit" class="md-primary" disabled>Check Answer</button>'}
           </form>
           ${feedback}
         </div>
@@ -407,13 +407,13 @@ const stops = [
   function summary() {
     const score = stops.filter(stop => state.answers[stop.id] === stop.correct).length;
     const results = stops.map(stop => `<li><strong>${escapeHtml(stop.id + " · " + stop.title)}</strong>
-      <p>${escapeHtml(stop.observation)}</p><p><b>Siguiente acción.</b> ${escapeHtml(stop.action)}</p></li>`).join("");
-    return `<h1 tabindex="-1">Registro de hallazgos</h1>
-      <p>Respuestas correctas: ${score} de ${stops.length}.</p>
+      <p>${escapeHtml(stop.observation)}</p><p><b>Next Action.</b> ${escapeHtml(stop.action)}</p></li>`).join("");
+    return `<h1 tabindex="-1">Inspection Findings</h1>
+      <p>Correct answers: ${score} of ${stops.length}.</p>
       <ul class="md-results">${results}</ul>
       <div class="md-actions">
-        <button type="button" class="md-secondary" data-view="overview">Volver a la vista general</button>
-        <button type="button" class="md-primary" data-restart>Reiniciar recorrido</button>
+        <button type="button" class="md-secondary" data-view="overview">Back to Overview</button>
+        <button type="button" class="md-primary" data-restart>Restart Route</button>
       </div>`;
   }
 
@@ -425,7 +425,7 @@ const stops = [
     const onReady = ready => {
       layer.hidden = !ready;
       world.hidden = ready;
-      caption.textContent = ready ? "Panorama 360° · Recreación didáctica" : "Vista de respaldo · Recreación didáctica";
+      caption.textContent = ready ? "360° Panorama · Training Simulation" : "Fallback View · Training Simulation";
       if (!ready) {
         panorama?.dispose();
         panorama = null;
@@ -437,7 +437,7 @@ const stops = [
         Array.from(layer.querySelectorAll("[data-photo-x]")),
         `./panoramas/${panoramas[state.viewpoint]}.webp`, onReady);
     } catch (error) {
-      console.warn("Visor panorámico no disponible", error);
+      console.warn("Panoramic viewer unavailable", error);
     }
     if (!panorama) onReady(false);
   }
@@ -448,7 +448,7 @@ const stops = [
     const stop = stops[state.active];
     const views = { overview, street: streetView, descent, stop: stopView, summary };
     root.querySelector(".md-content").innerHTML = views[state.view](stop);
-    root.querySelector(".md-progress").textContent = `${Object.keys(state.answers).length} de ${stops.length} paradas respondidas`;
+    root.querySelector(".md-progress").textContent = `${Object.keys(state.answers).length} of ${stops.length} stops answered`;
     if (state.view === "street") {
       mountPanorama();
       setLook(state.lookX, state.lookY);

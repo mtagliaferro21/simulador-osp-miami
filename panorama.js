@@ -185,7 +185,7 @@ window.createStreetPanorama = function createStreetPanorama(canvas, pins, src, o
       onReady(true);
       draw();
     } catch (error) {
-      console.warn("No se pudo preparar el panorama", error);
+      console.warn("The panorama could not be prepared", error);
       onReady(false);
     }
   };
