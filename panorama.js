@@ -73,6 +73,8 @@ function createPanoramaSoftware(context) {
   let textureHeight;
   let frame;
   let rays;
+  let rayHalfWidth;
+  let rayHalfHeight;
   return {
     density: (width, height) => Math.min(1, 800 / width, 480 / height),
     load(image) {
@@ -84,8 +86,13 @@ function createPanoramaSoftware(context) {
       texture = new Uint32Array(sourceContext.getImageData(0, 0, textureWidth, textureHeight).data.buffer);
     },
     draw(width, height, halfWidth, halfHeight, yaw, pitch) {
-      if (!frame || frame.width !== width || frame.height !== height) {
+      const frameChanged = !frame || frame.width !== width || frame.height !== height;
+      if (frameChanged) {
         frame = context.createImageData(width, height);
+      }
+      if (!rays || frameChanged || rayHalfWidth !== halfWidth || rayHalfHeight !== halfHeight) {
+        rayHalfWidth = halfWidth;
+        rayHalfHeight = halfHeight;
         rays = new Float32Array(width * height * 3);
         let i = 0;
         for (let row = 0; row < height; row++) {
@@ -135,7 +142,8 @@ window.createStreetPanorama = function createStreetPanorama(canvas, pins, src, o
   let loaded = false;
   let disposed = false;
   let yaw = 0;
-  let pitch = 0;
+  let targetPitch = 0;
+  let zoom = 1;
   let scheduled = 0;
   const image = new Image();
 
@@ -151,8 +159,12 @@ window.createStreetPanorama = function createStreetPanorama(canvas, pins, src, o
       canvas.height = pixelHeight;
     }
     const aspect = width / height;
-    const halfWidth = Math.min(Math.tan(51 * Math.PI / 180), .77 * aspect);
+    // Use a restrained rectilinear field of view on both wide and tall screens.
+    const halfWidth = Math.min(Math.tan(40 * Math.PI / 180), .59 * aspect) / zoom;
     const halfHeight = halfWidth / aspect;
+    // Keep the texture's polar regions outside the view at every zoom level.
+    const pitchLimit = Math.min(66 * Math.PI / 180, 80 * Math.PI / 180 - Math.atan(halfHeight));
+    const pitch = Math.max(-pitchLimit, Math.min(pitchLimit, targetPitch));
     renderer.draw(pixelWidth, pixelHeight, halfWidth, halfHeight, yaw, pitch);
 
     const cy = Math.cos(yaw), sy = Math.sin(yaw);
@@ -172,9 +184,10 @@ window.createStreetPanorama = function createStreetPanorama(canvas, pins, src, o
       }
     }
   }
-  function update(x, y) {
+  function update(x, y, magnification = 1) {
     yaw = (-x * .005) % (2 * Math.PI);
-    pitch = Math.max(-1.45, Math.min(1.45, y * .005));
+    targetPitch = y * .005;
+    zoom = magnification;
     if (loaded && !scheduled) scheduled = requestAnimationFrame(draw);
   }
   image.onload = () => {
@@ -185,7 +198,7 @@ window.createStreetPanorama = function createStreetPanorama(canvas, pins, src, o
       onReady(true);
       draw();
     } catch (error) {
-      console.warn("The panorama could not be prepared", error);
+      console.warn("No se pudo preparar el panorama", error);
       onReady(false);
     }
   };

@@ -60,11 +60,15 @@ body { margin: 0; }
 .md-street-camera{position:relative;isolation:isolate;overflow:hidden;border-radius:16px;background:#15334b;flex:1 0 150px;min-height:150px;max-height:680px;container-type:size;touch-action:none;cursor:grab;user-select:none}
 .md-street-camera:active{cursor:grabbing}
 .md-street-camera:focus-visible{outline:3px solid #087da6;outline-offset:3px}
-.md-street-world{position:absolute;left:50%;top:50%;width:max(128cqw,215cqh);aspect-ratio:16/9;transform:translate(calc(-50% + var(--look-x,0px)),calc(-50% + var(--look-y,0px)))}
+.md-street-world{position:absolute;left:50%;top:50%;width:max(128cqw,215cqh);aspect-ratio:16/9;transform:translate(calc(-50% + var(--look-x,0px)),calc(-50% + var(--look-y,0px))) scale(var(--look-scale,1))}
 .md-street-world>img{display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}
 .md-street-arrow{position:absolute;bottom:13%;left:50%;transform:translateX(-50%);display:grid;place-items:center;min-width:54px;height:48px;border:2px solid white;border-radius:100px;background:#0b2545;color:white;box-shadow:0 4px 18px #0008;font-size:1.45rem!important}
 .md-street-camera[data-point="1"] .md-pin-3{left:79%;top:84%}
 .md-street-arrow:hover{background:#0072a3}
+.md-zoom{position:absolute;z-index:2;top:10px;right:10px;display:flex;align-items:center;gap:4px;padding:3px;border-radius:10px;background:#0b2545;color:#fff;box-shadow:0 2px 10px #0005;cursor:default}
+.md-zoom output{min-width:42px;text-align:center;font-variant-numeric:tabular-nums;font-size:.75rem}
+.md-zoom button{width:36px;height:36px;border:0;border-radius:7px;background:#fff;color:#0b2545;font-size:1.3rem;line-height:1}
+.md-zoom button:disabled{opacity:.55}
 .md-street-caption{position:absolute;left:12px;bottom:10px;background:#0b2545;color:white;border-radius:6px;padding:3px 8px;font-size:.75rem;pointer-events:none}
 .md-street-bar,.md-street-activities,.md-utility-links{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:6px;text-align:center}
 .md-street-bar button,.md-street-activities button,.md-utility-links button{min-height:40px;padding:6px 11px;font-size:.875rem}
@@ -111,7 +115,7 @@ body { margin: 0; }
 .md-results dd{margin:0 0 7px;color:#315169}
 .md-street-camera[data-point="4"] .md-street-world{width:min(100cqw,177.777cqh)}
 </style>
-<script src="./panorama.js?v=2" defer></script>
+<script src="./panorama.js?v=3" defer></script>
 </head>
 <body>
 <main id="recorrido" class="md-simulator">
@@ -252,9 +256,9 @@ const stops = [
       evidence: "Check the drainage inventory for the inlet ID and connected pipe. Confirm invert elevations before assessing an underground crossing.",
     },
     roundCover: {
-      title: "Unmarked Round Access Cover", service: "Utility Type Unverified", mark: "UNK", color: "#475569",
-      visible: "A round access cover is visible in the roadway. Its markings cannot be read from this viewpoint.",
-      evidence: "Confirm the cover markings, asset ID, owner, and utility type against the operator’s records before classifying it.",
+      title: "Water Access Cover", service: "Water · Asset Type Unverified", mark: "WATER", color: "#075985",
+      visible: "A round cover in the roadway is marked WATER. The specific asset under the cover requires verification.",
+      evidence: "Verify the asset ID, owner, and function in the water utility’s records.",
     },
     distribution: {
       title: "Overhead Distribution Pole", service: "Power · Electric Distribution", mark: "POWER", color: "#865200",
@@ -277,11 +281,11 @@ const stops = [
     { photo: document.getElementById("vista-cruce").textContent.trim(), name: "Intersection", nextIsTurn: true, alt: "Intersection with a residential side street on the right.", assets: [] },
     { photo: document.getElementById("vista-lateral").textContent.trim(), name: "Side Street", alt: "Side street with a fire hydrant, sanitary sewer manhole, transformer, and telco pedestal.",
       assets: [["hydrant", 19.3, 51.7], ["sewer", 47.8, 73.5], ["transformer", 70.8, 45.4], ["telecom", 80.5, 56.1]] },
-    { photo: "./panoramas/utility-block-preview.webp", name: "Utility Block", alt: "Residential block with a curbside drain grate, a round roadway cover, a power distribution pole, and a Telco handhole.",
+    { photo: "./panoramas/utility-block-v2-preview.webp", name: "Utility Block", alt: "Residential block with a curbside drain grate, a round roadway cover, a power distribution pole, and a Telco handhole.",
       initialLookY: -63,
       assets: [["grate", 18.33, 82.07], ["roundCover", 44.16, 75.61], ["distribution", 72.11, 25.04], ["telcoCover", 86.96, 77.26]] },
   ];
-  const panoramas = ["principal", "tramo", "interseccion", "lateral", "utility-block"];
+  const panoramas = ["principal", "tramo", "interseccion", "lateral", "utility-block-v2"];
   const panoramaAssets = [
     [["drain", 73, 77], ["cover", 80.5, 72], ["light", 58.6, 45]],
     [["light", 73.7, 64.3]],
@@ -290,9 +294,11 @@ const stops = [
     [["grate", 31.2, 70.4], ["roundCover", 43.9, 80.5], ["distribution", 61.2, 46.5], ["telcoCover", 69.2, 66.8]],
   ];
   let panorama;
+  const minZoom = .9;
+  const maxZoom = 2.4;
   const state = {
     view: "overview", active: 0, selected: null, answers: {},
-    viewpoint: 0, lookX: 0, lookY: 0, backTo: "overview", streetPanel: "assets",
+    viewpoint: 0, lookX: 0, lookY: 0, zoom: 1, backTo: "overview", streetPanel: "assets",
   };
   let drag = null;
   const root = document.querySelector("#recorrido");
@@ -363,7 +369,7 @@ const stops = [
       <button class="md-secondary" type="button" data-open="${index}">${escapeHtml(stop.title)}${stop.id in state.answers ? " ✓" : ""}</button>`).join("");
     return `<div class="md-street-head"><h1 tabindex="-1">360° Street View</h1>
       <button class="md-secondary" type="button" data-view="overview">Overview</button></div>
-      <p id="md-street-guide">Drag to rotate 360° or look up and down. Use the route arrows to move between viewpoints and select markers to identify utilities.</p>
+      <p id="md-street-guide">Drag to look around. Scroll over the panorama to zoom. Use the route arrows to move and select markers to inspect utilities.</p>
       <div class="md-street-layout">
         <div class="md-street-camera" data-point="${state.viewpoint}" tabindex="0" role="group" aria-label="Route Viewer" aria-describedby="md-street-guide md-street-point">
           <div class="md-street-world"><img draggable="false" src="${current.photo}" alt="${escapeHtml(current.alt)}">${pins}</div>
@@ -372,6 +378,11 @@ const stops = [
           </div>
           ${last ? "" : `<button class="md-street-arrow" type="button" data-move="1"
             aria-label="${turning ? "Turn Right" : "Advance Along Street"}">${turning ? "↱" : "↑"}</button>`}
+          <div class="md-zoom" role="group" aria-label="Panorama Zoom">
+            <button type="button" data-zoom-step="-1" aria-label="Zoom Out">−</button>
+            <output aria-label="Zoom Level" aria-live="off"></output>
+            <button type="button" data-zoom-step="1" aria-label="Zoom In">+</button>
+          </div>
           <span class="md-street-caption">Training Simulation</span>
         </div>
         <div class="md-street-bar">
@@ -411,23 +422,45 @@ const stops = [
     if (!camera) return;
     if (panorama) {
       state.lookX = x;
-      state.lookY = Math.max(-290, Math.min(290, y));
-      panorama.update(state.lookX, state.lookY);
+      state.lookY = Math.max(-230, Math.min(230, y));
+      panorama.update(state.lookX, state.lookY, state.zoom);
       return;
     }
     const world = camera.querySelector(".md-street-world");
-    const limitX = Math.max(0, (world.clientWidth - camera.clientWidth) / 2);
-    const limitY = Math.max(0, (world.clientHeight - camera.clientHeight) / 2);
+    const scale = Math.max(1, state.zoom);
+    const limitX = Math.max(0, (world.clientWidth * scale - camera.clientWidth) / 2);
+    const limitY = Math.max(0, (world.clientHeight * scale - camera.clientHeight) / 2);
+    world.style.setProperty("--look-scale", scale);
     state.lookX = Math.max(-limitX, Math.min(limitX, x));
     state.lookY = Math.max(-limitY, Math.min(limitY, y));
     world.style.setProperty("--look-x", `${state.lookX}px`);
     world.style.setProperty("--look-y", `${state.lookY}px`);
   }
 
+  function updateZoomControls(camera) {
+    const minimum = panorama ? minZoom : 1;
+    camera.querySelector(".md-zoom output").textContent = `${Math.round(state.zoom * 100)}%`;
+    camera.querySelector('[data-zoom-step="-1"]').disabled = state.zoom <= minimum;
+    camera.querySelector('[data-zoom-step="1"]').disabled = state.zoom >= maxZoom;
+  }
+
+  function setZoom(magnification, x = state.lookX, y = state.lookY) {
+    const camera = root.querySelector(".md-street-camera");
+    const minimum = panorama ? minZoom : 1;
+    state.zoom = Math.max(minimum, Math.min(maxZoom, magnification));
+    updateZoomControls(camera);
+    setLook(x, y);
+  }
+
+  function resetView() {
+    setZoom(1, 0, viewpoints[state.viewpoint].initialLookY ?? 0);
+  }
+
   function moveStreet(direction) {
     const next = state.viewpoint + direction;
     if (next < 0 || next >= viewpoints.length) return;
     state.viewpoint = next;
+    state.zoom = 1;
     state.lookX = 0;
     state.lookY = viewpoints[next].initialLookY ?? 0;
     drag = null;
@@ -501,7 +534,7 @@ const stops = [
       if (!ready) {
         panorama?.dispose();
         panorama = null;
-        setLook(0, 0);
+        setZoom(state.zoom, 0, 0);
       }
     };
     try {
@@ -525,6 +558,7 @@ const stops = [
     root.querySelector(".md-progress").textContent = `${Object.keys(state.answers).length} of ${stops.length} stops answered`;
     if (state.view === "street") {
       mountPanorama();
+      updateZoomControls(root.querySelector(".md-street-camera"));
       setLook(state.lookX, state.lookY);
     }
     if (focusSelector) root.querySelector(focusSelector)?.focus({ preventScroll: state.view === "street" });
@@ -572,14 +606,17 @@ const stops = [
       root.querySelector("#md-visible-assets").hidden = state.streetPanel !== "assets";
       root.querySelector("#md-inspection-tasks").hidden = state.streetPanel !== "tasks";
       setLook(state.lookX, state.lookY);
+    } else if ("zoomStep" in button.dataset) {
+      setZoom(state.zoom * (1.15 ** Number(button.dataset.zoomStep)));
     } else if ("center" in button.dataset) {
-      setLook(0, viewpoints[state.viewpoint].initialLookY ?? 0);
+      resetView();
     } else if ("restart" in button.dataset) {
       state.answers = {};
       state.streetPanel = "assets";
       state.viewpoint = 0;
       state.lookX = 0;
       state.lookY = 0;
+      state.zoom = 1;
       state.selected = null;
       navigate("overview");
     } else if ("next" in button.dataset) {
@@ -628,10 +665,21 @@ const stops = [
     });
   }
 
+  root.addEventListener("wheel", event => {
+    const camera = event.target.closest(".md-street-camera");
+    if (!camera || event.ctrlKey || event.metaKey) return;
+    const mode = event.deltaMode;
+    if (!event.deltaY) return;
+    event.preventDefault();
+    const unit = mode === 1 ? 16 : mode === 2 ? camera.clientHeight : 1;
+    const delta = Math.max(-160, Math.min(160, event.deltaY * unit));
+    setZoom(state.zoom * Math.exp(-delta * .0015));
+  }, { passive: false });
+
   root.addEventListener("keydown", event => {
     if (!event.target.matches(".md-street-camera")) return;
     const key = event.key;
-    if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home"].includes(key)) return;
+    if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "+", "=", "-"].includes(key)) return;
     event.preventDefault();
     if (key === "ArrowUp") moveStreet(1);
     if (key === "ArrowDown") moveStreet(-1);
@@ -639,7 +687,9 @@ const stops = [
     if (key === "ArrowRight") setLook(state.lookX - 40, state.lookY);
     if (key === "PageUp") setLook(state.lookX, state.lookY + 40);
     if (key === "PageDown") setLook(state.lookX, state.lookY - 40);
-    if (key === "Home") setLook(0, viewpoints[state.viewpoint].initialLookY ?? 0);
+    if (key === "Home") resetView();
+    if (key === "+" || key === "=") setZoom(state.zoom * 1.15);
+    if (key === "-") setZoom(state.zoom / 1.15);
   });
 
   window.addEventListener("resize", () => {
