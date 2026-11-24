@@ -46,9 +46,18 @@ body { margin: 0; }
 @media(max-width:820px){.md-grid,.md-results{grid-template-columns:1fr}}
 @media(max-width:485px){.md-header{gap:10px;flex-wrap:wrap}.md-header img{width:90px}.md-progress{margin-left:0;width:100%;text-align:left}.md-pin{width:34px;height:34px}}
 @media(prefers-reduced-motion:reduce){.md-transition img{animation:none}}
-.md-street-head{display:flex;justify-content:space-between;align-items:start;gap:12px;flex-wrap:wrap}
-.md-street-layout{display:grid;gap:12px}
-.md-street-camera{position:relative;isolation:isolate;overflow:hidden;border-radius:16px;background:#15334b;aspect-ratio:16/8;container-type:size;touch-action:none;cursor:grab;user-select:none}
+.md-simulator[data-view="street"]{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh}
+.md-simulator[data-view="street"] .md-header{flex:none;padding-block:6px}
+.md-content[data-view="street"]{width:100%;margin:0 auto;padding:clamp(8px,1.6vh,20px) clamp(12px,3vw,40px);display:flex;flex:1;flex-direction:column}
+.md-content[data-view="overview"]>h1,.md-content[data-view="overview"]>p{text-align:center}
+.md-street-head{position:relative;display:grid;place-items:center;min-height:38px;text-align:center}
+.md-street-head h1{margin:0;font-size:clamp(1.35rem,3vw,2.2rem)}
+.md-street-head>button{position:absolute;right:0;top:50%;transform:translateY(-50%);min-height:36px;padding:5px 10px;font-size:.88rem}
+.md-content #md-street-guide{margin:4px auto 10px;text-align:center;font-size:.88rem;line-height:1.35}
+.md-street-layout{display:flex;flex:1;flex-direction:column;gap:8px}
+@media(max-width:540px){.md-street-head{display:flex;gap:6px;flex-direction:column}.md-street-head>button{position:static;transform:none}}
+
+.md-street-camera{position:relative;isolation:isolate;overflow:hidden;border-radius:16px;background:#15334b;flex:1 0 150px;min-height:150px;max-height:680px;container-type:size;touch-action:none;cursor:grab;user-select:none}
 .md-street-camera:active{cursor:grabbing}
 .md-street-camera:focus-visible{outline:3px solid #087da6;outline-offset:3px}
 .md-street-world{position:absolute;left:50%;top:50%;width:max(128cqw,215cqh);aspect-ratio:16/9;transform:translate(calc(-50% + var(--look-x,0px)),calc(-50% + var(--look-y,0px)))}
@@ -57,16 +66,16 @@ body { margin: 0; }
 .md-street-camera[data-point="1"] .md-pin-3{left:79%;top:84%}
 .md-street-arrow:hover{background:#0072a3}
 .md-street-caption{position:absolute;left:12px;bottom:10px;background:#0b2545;color:white;border-radius:6px;padding:3px 8px;font-size:.75rem;pointer-events:none}
-.md-street-bar,.md-street-activities{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.md-street-bar,.md-street-activities,.md-utility-links{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:6px;text-align:center}
+.md-street-bar button,.md-street-activities button,.md-utility-links button{min-height:40px;padding:6px 11px;font-size:.875rem}
+@media(max-width:540px){.md-street-index{order:-1;flex-basis:100%}}
+
 .md-street-index{font-size:.9rem;font-weight:700;margin-inline:4px}
-.md-street-activities button{min-height:44px}
-.md-street-camera+div button{min-height:44px}
-@media(max-width:600px){.md-street-camera{aspect-ratio:4/3}.md-street-arrow{bottom:15%}}
+@media(max-width:600px){.md-street-arrow{bottom:15%}}
 .md-utility-pin{position:absolute;display:grid;place-items:center;min-width:44px;height:44px;padding:0 6px;border:2px solid #fff;border-radius:24px;background:var(--utility-color);color:#fff;box-shadow:0 2px 12px #0009;transform:translate(-50%,-100%);font-size:.68rem!important;font-weight:850!important;white-space:nowrap}
 .md-utility-pin::after{content:"";position:absolute;left:50%;top:100%;width:2px;height:7px;background:white;transform:translateX(-50%)}
 .md-utility-pin:hover{filter:brightness(1.14)}
 .md-utility-pin:focus-visible{outline-color:#fff!important}
-.md-utility-links{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
 .md-utility-link{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:7px 10px;border:1px solid #d5e3ee;border-radius:8px;background:#fff;color:#0b2545;text-align:left;font-size:.85rem!important}
 .md-utility-link::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--utility-color);flex:none}
 .md-simulator .md-utility-dialog{width:min(520px,calc(100% - 32px));max-height:calc(100% - 32px);padding:clamp(16px,4vw,28px);overflow:auto;border:1px solid #d5e3ee;border-radius:14px;background:#fff;color:#0b2545;box-shadow:0 20px 70px #001f3b55}
@@ -447,7 +456,9 @@ const stops = [
     panorama = null;
     const stop = stops[state.active];
     const views = { overview, street: streetView, descent, stop: stopView, summary };
-    root.querySelector(".md-content").innerHTML = views[state.view](stop);
+    const content = root.querySelector(".md-content");
+    root.dataset.view = content.dataset.view = state.view;
+    content.innerHTML = views[state.view](stop);
     root.querySelector(".md-progress").textContent = `${Object.keys(state.answers).length} of ${stops.length} stops answered`;
     if (state.view === "street") {
       mountPanorama();
@@ -461,6 +472,7 @@ const stops = [
     drag = null;
     state.view = view;
     render("h1");
+    if (view === "street" || view === "overview") window.scrollTo(0, 0);
   }
 
   function openStop(index) {
