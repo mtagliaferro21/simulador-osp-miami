@@ -95,6 +95,21 @@ body { margin: 0; }
 .md-pano-layer[hidden],.md-utility-pin[hidden]{display:none}
 .md-street-arrow,.md-street-caption{z-index:2}
 .md-street-world[hidden]{display:none}
+.md-stop-name{display:flex;align-items:center;gap:9px}
+.md-stop-number{display:grid;place-items:center;flex:none;width:27px;height:27px;border-radius:50%;background:#dce9f5;color:#0b2545}
+.md-stops h2{font-size:.92rem;margin:4px 0 0}
+.md-stop-link:hover,.md-stop-link:focus-visible{border-color:#087da6;background:#e9f4fa}
+.md-pin.is-highlighted{background:#087da6;outline:3px solid white;outline-offset:3px;z-index:1}
+.md-street-tools{display:grid;gap:6px;flex:none}
+.md-tool-options{display:flex;justify-content:center;gap:4px;flex-wrap:wrap}
+.md-tool-options button{min-height:36px;padding:5px 10px;font-size:.875rem}
+.md-tool-options [aria-pressed="true"]{background:#0b2545;color:white}
+.md-street-tools [hidden]{display:none}
+.md-content .md-empty-assets{margin:0;text-align:center;font-size:.875rem;color:#315169}
+.md-results dl{display:grid;gap:4px;margin:10px 0 0}
+.md-results dt{font-weight:750}
+.md-results dd{margin:0 0 7px;color:#315169}
+.md-street-camera[data-point="4"] .md-street-world{width:min(100cqw,177.777cqh)}
 </style>
 <script src="./panorama.js?v=2" defer></script>
 </head>
@@ -151,12 +166,13 @@ const street = document.getElementById("foto-2").textContent.trim();
 
 const stops = [
   {
-    id: "DR-01", title: "Stormwater", photo: document.getElementById("foto-3").textContent.trim(),
+    id: "DR-01", title: "Storm Drain Inlet", photo: document.getElementById("foto-3").textContent.trim(),
     alt: "Storm drain grate flush with the gutter next to the curb.",
     observation: "The grate next to the curb identifies a visible stormwater inlet.",
     question: "What information is needed to assess an underground crossing near this inlet?",
     choices: ["The approximate location of the grate.", "The pipe alignment, dimensions, and invert elevations.", "The visible pavement width."],
     correct: 1, feedback: "Request the pipe alignment, dimensions, and invert elevations at the crossing. Use those records to evaluate utility clearance.",
+    verification: "Pipe alignment, dimensions, invert elevations, and utility clearance at the crossing.",
     action: "Request stormwater drawings and verify the crossing.",
   },
   {
@@ -166,6 +182,7 @@ const stops = [
     question: "How should this structure be recorded in the preliminary asset inventory?",
     choices: ["Telco handhole with available capacity.", "Authorized OSP connection point.", "Potential handhole. Verify the utility type, asset ID, and owner."],
     correct: 2, feedback: "Record it as a potential handhole. Confirm the asset ID, owner, utility type, and connections against the operator’s records.",
+    verification: "Utility type, asset ID, owner, and connections.",
     action: "Review the operator’s asset inventory and drawings.",
   },
   {
@@ -175,6 +192,7 @@ const stops = [
     question: "What should you verify before laying out an excavation next to the tree?",
     choices: ["The tree protection zone and applicable requirements.", "The visible trunk diameter alone.", "The distance to the edge of the canopy’s shadow."],
     correct: 0, feedback: "Verify the tree protection zone and applicable requirements before defining the excavation footprint.",
+    verification: "Tree protection zone and applicable excavation requirements.",
     action: "Confirm the tree protection zone and review the work envelope.",
   },
   {
@@ -184,6 +202,7 @@ const stops = [
     question: "What evidence is needed before considering this pole for an OSP attachment?",
     choices: ["A photograph of the luminaire.", "The asset ID, owner, technical requirements, and attachment authorization.", "The pole’s proximity to the preliminary route."],
     correct: 1, feedback: "Identify the asset and confirm its owner. Request the technical requirements and authorization before considering it for an OSP attachment.",
+    verification: "Asset ID, owner, technical requirements, and attachment authorization.",
     action: "Contact the owner and request the attachment requirements.",
   },
 ];
@@ -226,27 +245,54 @@ const stops = [
     },
   };
 
+  Object.assign(utilities, {
+    grate: {
+      title: "Curbside Storm Drain Grate", service: "Stormwater", mark: "STORM", color: "#315169",
+      visible: "A rectangular grate is set into the gutter along the left curb.",
+      evidence: "Check the drainage inventory for the inlet ID and connected pipe. Confirm invert elevations before assessing an underground crossing.",
+    },
+    roundCover: {
+      title: "Unmarked Round Access Cover", service: "Utility Type Unverified", mark: "UNK", color: "#475569",
+      visible: "A round access cover is visible in the roadway. Its markings cannot be read from this viewpoint.",
+      evidence: "Confirm the cover markings, asset ID, owner, and utility type against the operator’s records before classifying it.",
+    },
+    distribution: {
+      title: "Overhead Distribution Pole", service: "Power · Electric Distribution", mark: "POWER", color: "#865200",
+      visible: "A wood pole supports a crossarm, insulators, and overhead conductors.",
+      evidence: "Verify the pole ID, owner, and documented attachments. Request applicable clearance and attachment requirements from the owner.",
+    },
+    telcoCover: {
+      title: "Telco Handhole", service: "Telco · Telecommunications", mark: "TELCO", color: "#146052",
+      visible: "A rectangular access cover is flush with the grass verge. The exercise inventory identifies it as a Telco handhole.",
+      evidence: "Verify the asset ID and owner in the operator’s inventory. Request duct and connection records before evaluating an OSP tie-in.",
+    },
+  });
+
   // Camera positions and marker coordinates as percentages of each image.
   const viewpoints = [
     { photo: street, name: "Main Street", alt: "Start of the main street next to the storm drain inlet, access cover, and streetlight pole.",
       assets: [["drain", 44, 86], ["cover", 71, 82], ["light", 38, 43]] },
     { photo: document.getElementById("vista-media").textContent.trim(), name: "Main Street", alt: "Midblock view on the main street next to the streetlight pole.",
       assets: [["light", 79, 83]] },
-    { photo: document.getElementById("vista-cruce").textContent.trim(), name: "Intersection", alt: "Intersection with a residential side street on the right.", assets: [] },
+    { photo: document.getElementById("vista-cruce").textContent.trim(), name: "Intersection", nextIsTurn: true, alt: "Intersection with a residential side street on the right.", assets: [] },
     { photo: document.getElementById("vista-lateral").textContent.trim(), name: "Side Street", alt: "Side street with a fire hydrant, sanitary sewer manhole, transformer, and telco pedestal.",
       assets: [["hydrant", 19.3, 51.7], ["sewer", 47.8, 73.5], ["transformer", 70.8, 45.4], ["telecom", 80.5, 56.1]] },
+    { photo: "./panoramas/utility-block-preview.webp", name: "Utility Block", alt: "Residential block with a curbside drain grate, a round roadway cover, a power distribution pole, and a Telco handhole.",
+      initialLookY: -63,
+      assets: [["grate", 18.33, 82.07], ["roundCover", 44.16, 75.61], ["distribution", 72.11, 25.04], ["telcoCover", 86.96, 77.26]] },
   ];
-  const panoramas = ["principal", "tramo", "interseccion", "lateral"];
+  const panoramas = ["principal", "tramo", "interseccion", "lateral", "utility-block"];
   const panoramaAssets = [
     [["drain", 73, 77], ["cover", 80.5, 72], ["light", 58.6, 45]],
     [["light", 73.7, 64.3]],
     [],
     [["hydrant", 26.8, 74.2], ["sewer", 49.1, 76.7], ["transformer", 66.7, 64.4], ["telecom", 74.5, 74.2]],
+    [["grate", 31.2, 70.4], ["roundCover", 43.9, 80.5], ["distribution", 61.2, 46.5], ["telcoCover", 69.2, 66.8]],
   ];
   let panorama;
   const state = {
     view: "overview", active: 0, selected: null, answers: {},
-    viewpoint: 0, lookX: 0, lookY: 0, backTo: "overview",
+    viewpoint: 0, lookX: 0, lookY: 0, backTo: "overview", streetPanel: "assets",
   };
   let drag = null;
   const root = document.querySelector("#recorrido");
@@ -263,23 +309,31 @@ const stops = [
       <figcaption>${escapeHtml(caption)}</figcaption>${extra}</figure>`;
   }
 
+  function summaryButton() {
+    return Object.keys(state.answers).length === stops.length
+      ? '<button type="button" class="md-primary" data-view="summary">View Inspection Summary</button>'
+      : "";
+  }
+
   function overview() {
     const pins = stops.map((stop, index) =>
       `<button type="button" class="md-pin md-pin-${index}" data-open="${index}"
         aria-label="${escapeHtml("Open " + stop.id + " · " + stop.title)}">${index + 1}</button>`).join("");
     const menu = stops.map((stop, index) => `
       <button type="button" class="md-stop-link" data-open="${index}">
-        <span>${escapeHtml(stop.id + " · " + stop.title)}</span>
-        <span class="md-status">${stop.id in state.answers ? "Answered" : "Explore"}</span>
+        <span class="md-stop-name"><span class="md-stop-number" aria-hidden="true">${index + 1}</span>
+          <span>${escapeHtml(stop.id + " · " + stop.title)}</span></span>
+        ${stop.id in state.answers ? '<span class="md-status">Completed</span>' : ""}
       </button>`).join("");
     return `<h1 tabindex="-1">Residential Inspection Route · Miami-Dade</h1>
-      <p>Select an inspection stop to observe the asset and determine what information needs verification.</p>
+      <p>Explore the street in 360° or select an inspection stop to review the evidence.</p>
       <div class="md-grid">
         ${image(street, "Residential street with a storm drain inlet, access cover, tree, and streetlight pole.", "Route Overview · Training Simulation", pins)}
         <div class="md-panel md-stops">
-          <button type="button" class="md-primary" data-view="street">Enter Street View</button>
+          <button type="button" class="md-primary" data-view="street">Start 360° Inspection</button>
+          <h2>Inspection Stops</h2>
           ${menu}
-          <button type="button" class="md-primary" data-view="summary" ${Object.keys(state.answers).length === stops.length ? "" : "disabled"}>View Summary</button>
+          ${summaryButton()}
         </div>
       </div>`;
   }
@@ -288,7 +342,7 @@ const stops = [
     const current = viewpoints[state.viewpoint];
     const first = state.viewpoint === 0;
     const last = state.viewpoint === viewpoints.length - 1;
-    const turning = state.viewpoint === viewpoints.length - 2;
+    const turning = current.nextIsTurn;
     const pins = current.assets.map(([id, x, y]) => {
       const asset = utilities[id];
       return `<button type="button" class="md-utility-pin" style="left:${x}%;top:${y}%;--utility-color:${asset.color}"
@@ -326,9 +380,16 @@ const stops = [
           <button class="md-secondary" type="button" data-move="1" ${last ? "disabled" : ""}>${turning ? "Turn Right ↱" : "Next →"}</button>
           <button class="md-secondary" type="button" data-center>Reset View</button>
         </div>
-        ${utilityLinks ? `<div class="md-utility-links" role="group" aria-label="Visible Utilities">${utilityLinks}</div>` : ""}
-        <div class="md-street-activities" aria-label="Inspection Stops" role="group">${activities}
-          ${Object.keys(state.answers).length === stops.length ? '<button class="md-primary" type="button" data-view="summary">View Summary</button>' : ""}
+        <div class="md-street-tools">
+          <div class="md-tool-options" role="group" aria-label="Street View tools">
+            <button type="button" class="md-secondary" data-street-panel="assets" aria-controls="md-visible-assets" aria-pressed="${state.streetPanel === "assets"}">Visible Assets</button>
+            <button type="button" class="md-secondary" data-street-panel="tasks" aria-controls="md-inspection-tasks" aria-pressed="${state.streetPanel === "tasks"}">Inspection Tasks</button>
+            ${summaryButton()}
+          </div>
+          <div id="md-visible-assets" class="md-utility-links" role="group" aria-label="Visible Assets" ${state.streetPanel === "assets" ? "" : "hidden"}>
+            ${utilityLinks || '<p class="md-empty-assets">Advance to the next viewpoint to inspect more assets.</p>'}
+          </div>
+          <div id="md-inspection-tasks" class="md-street-activities" role="group" aria-label="Inspection Tasks" ${state.streetPanel === "tasks" ? "" : "hidden"}>${activities}</div>
         </div>
       </div>`;
   }
@@ -368,7 +429,7 @@ const stops = [
     if (next < 0 || next >= viewpoints.length) return;
     state.viewpoint = next;
     state.lookX = 0;
-    state.lookY = 0;
+    state.lookY = viewpoints[next].initialLookY ?? 0;
     drag = null;
     render(".md-street-camera");
   }
@@ -394,7 +455,7 @@ const stops = [
         <strong>${answer === stop.correct ? "Correct Answer" : "Review the Required Evidence"}</strong>
         <p>${escapeHtml(stop.feedback)}</p>
       </div>
-      <button type="button" class="md-primary" data-next>${Object.keys(state.answers).length === stops.length ? "View Summary" : "Next Unanswered Stop"}</button>` : "";
+      <button type="button" class="md-primary" data-next>${Object.keys(state.answers).length === stops.length ? "View Inspection Summary" : "Next Unanswered Stop"}</button>` : "";
     return `<button type="button" class="md-back" data-view="${state.backTo}">${state.backTo === "street" ? "← Back to Street View" : "← Overview"}</button>
       <h1 tabindex="-1">${escapeHtml(stop.id + " · " + stop.title)}</h1>
       <div class="md-grid">
@@ -416,7 +477,9 @@ const stops = [
   function summary() {
     const score = stops.filter(stop => state.answers[stop.id] === stop.correct).length;
     const results = stops.map(stop => `<li><strong>${escapeHtml(stop.id + " · " + stop.title)}</strong>
-      <p>${escapeHtml(stop.observation)}</p><p><b>Next Action.</b> ${escapeHtml(stop.action)}</p></li>`).join("");
+      <dl><dt>Observed in the field</dt><dd>${escapeHtml(stop.observation)}</dd>
+        <dt>Requires verification</dt><dd>${escapeHtml(stop.verification)}</dd>
+        <dt>Next action</dt><dd>${escapeHtml(stop.action)}</dd></dl></li>`).join("");
     return `<h1 tabindex="-1">Inspection Findings</h1>
       <p>Correct answers: ${score} of ${stops.length}.</p>
       <ul class="md-results">${results}</ul>
@@ -502,10 +565,18 @@ const stops = [
       navigate(button.dataset.view);
     } else if ("move" in button.dataset) {
       moveStreet(Number(button.dataset.move));
+    } else if ("streetPanel" in button.dataset) {
+      state.streetPanel = button.dataset.streetPanel;
+      root.querySelectorAll("[data-street-panel]").forEach(option =>
+        option.setAttribute("aria-pressed", String(option === button)));
+      root.querySelector("#md-visible-assets").hidden = state.streetPanel !== "assets";
+      root.querySelector("#md-inspection-tasks").hidden = state.streetPanel !== "tasks";
+      setLook(state.lookX, state.lookY);
     } else if ("center" in button.dataset) {
-      setLook(0, 0);
+      setLook(0, viewpoints[state.viewpoint].initialLookY ?? 0);
     } else if ("restart" in button.dataset) {
       state.answers = {};
+      state.streetPanel = "assets";
       state.viewpoint = 0;
       state.lookX = 0;
       state.lookY = 0;
@@ -522,6 +593,15 @@ const stops = [
       navigate("summary");
     }
   });
+
+  for (const [eventType, active] of [["pointerover", true], ["pointerout", false], ["focusin", true], ["focusout", false]]) {
+    root.addEventListener(eventType, event => {
+      const row = event.target.closest(".md-stop-link");
+      if (!row || row.contains(event.relatedTarget)) return;
+      const highlighted = active || row.matches(":hover, :focus-visible");
+      root.querySelector(`.md-pin[data-open="${row.dataset.open}"]`)?.classList.toggle("is-highlighted", highlighted);
+    });
+  }
 
   utilityDialog.addEventListener("click", event => {
     if (event.target !== utilityDialog) return;
@@ -559,7 +639,7 @@ const stops = [
     if (key === "ArrowRight") setLook(state.lookX - 40, state.lookY);
     if (key === "PageUp") setLook(state.lookX, state.lookY + 40);
     if (key === "PageDown") setLook(state.lookX, state.lookY - 40);
-    if (key === "Home") setLook(0, 0);
+    if (key === "Home") setLook(0, viewpoints[state.viewpoint].initialLookY ?? 0);
   });
 
   window.addEventListener("resize", () => {
