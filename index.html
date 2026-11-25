@@ -115,7 +115,7 @@ body { margin: 0; }
 .md-results dd{margin:0 0 7px;color:#315169}
 .md-street-camera[data-point="4"] .md-street-world{width:min(100cqw,177.777cqh)}
 </style>
-<script src="./panorama.js?v=4" defer></script>
+<script src="./panorama.js?v=5" defer></script>
 </head>
 <body>
 <main id="recorrido" class="md-simulator">
@@ -142,35 +142,16 @@ body { margin: 0; }
 
 <script>
 "use strict";
-window.addEventListener("DOMContentLoaded", async () => {
-  try {
-    const response = await fetch("./datos/escenas.html");
-    if (!response.ok) throw new Error("Scene assets unavailable");
-    const source = new DOMParser().parseFromString(await response.text(), "text/html");
-    for (const id of ["foto-1", "foto-2", "foto-3", "foto-4", "foto-5", "foto-6", "vista-media", "vista-cruce", "vista-lateral"]) {
-      const data = source.getElementById(id)?.textContent.trim();
-      if (!/^data:image\/(png|webp);base64,/.test(data ?? "")) throw new Error("Image asset missing");
-      const item = document.createElement("script");
-      item.type = "text/plain";
-      item.id = id;
-      item.textContent = data;
-      document.body.append(item);
-    }
-    startSimulator();
-  } catch (error) {
-    document.querySelector(".md-content").textContent = "The scenes could not be loaded. Reload the page to try again.";
-    console.error(error);
-  }
-});
-function startSimulator() {
+window.addEventListener("DOMContentLoaded", startSimulator);
 
+function startSimulator() {
 // Edita las preguntas, opciones y explicaciones en este bloque.
-const brand = document.getElementById("foto-1").textContent.trim();
-const street = document.getElementById("foto-2").textContent.trim();
+const brand = "./datos/fiberlog.png";
+const street = "./datos/foto-2-hq.webp";
 
 const stops = [
   {
-    id: "DR-01", title: "Storm Drain Inlet", photo: document.getElementById("foto-3").textContent.trim(),
+    id: "DR-01", title: "Storm Drain Inlet", photo: "./datos/foto-3-hq.webp",
     alt: "Storm drain grate flush with the gutter next to the curb.",
     observation: "The grate next to the curb identifies a visible stormwater inlet.",
     question: "What information is needed to assess an underground crossing near this inlet?",
@@ -180,7 +161,7 @@ const stops = [
     action: "Request stormwater drawings and verify the crossing.",
   },
   {
-    id: "HH-01", title: "Potential Handhole", photo: document.getElementById("foto-4").textContent.trim(),
+    id: "HH-01", title: "Potential Handhole", photo: "./datos/foto-4-hq.webp",
     alt: "Closed rectangular access cover flush with the grass verge.",
     observation: "A rectangular access cover is visible, with no legible identification.",
     question: "How should this structure be recorded in the preliminary asset inventory?",
@@ -190,7 +171,7 @@ const stops = [
     action: "Review the operator’s asset inventory and drawings.",
   },
   {
-    id: "TR-01", title: "Tree", photo: document.getElementById("foto-5").textContent.trim(),
+    id: "TR-01", title: "Tree", photo: "./datos/foto-5-hq.webp",
     alt: "Tree with visible trunk and canopy in the verge between the sidewalk and roadway.",
     observation: "The tree trunk is in the grass verge next to the sidewalk.",
     question: "What should you verify before laying out an excavation next to the tree?",
@@ -200,7 +181,7 @@ const stops = [
     action: "Confirm the tree protection zone and review the work envelope.",
   },
   {
-    id: "LT-01", title: "Streetlight Pole", photo: document.getElementById("foto-6").textContent.trim(),
+    id: "LT-01", title: "Streetlight Pole", photo: "./datos/foto-6-hq.webp",
     alt: "Streetlight pole with a visible base, curved mast arm, and luminaire.",
     observation: "The pole base, mast arm, and luminaire are visible.",
     question: "What evidence is needed before considering this pole for an OSP attachment?",
@@ -276,16 +257,16 @@ const stops = [
   const viewpoints = [
     { photo: street, name: "Main Street", alt: "Start of the main street next to the storm drain inlet, access cover, and streetlight pole.",
       assets: [["drain", 44, 86], ["cover", 71, 82], ["light", 38, 43]] },
-    { photo: document.getElementById("vista-media").textContent.trim(), name: "Main Street", alt: "Midblock view on the main street next to the streetlight pole.",
+    { photo: "./datos/vista-media-hq.webp", name: "Main Street", alt: "Midblock view on the main street next to the streetlight pole.",
       assets: [["light", 79, 83]] },
-    { photo: document.getElementById("vista-cruce").textContent.trim(), name: "Intersection", nextIsTurn: true, alt: "Intersection with a residential side street on the right.", assets: [] },
-    { photo: document.getElementById("vista-lateral").textContent.trim(), name: "Side Street", alt: "Side street with a fire hydrant, sanitary sewer manhole, transformer, and telco pedestal.",
+    { photo: "./datos/vista-cruce-hq.webp", name: "Intersection", nextIsTurn: true, alt: "Intersection with a residential side street on the right.", assets: [] },
+    { photo: "./datos/vista-lateral-hq.webp", name: "Side Street", alt: "Side street with a fire hydrant, sanitary sewer manhole, transformer, and telco pedestal.",
       assets: [["hydrant", 19.3, 51.7], ["sewer", 47.8, 73.5], ["transformer", 70.8, 45.4], ["telecom", 80.5, 56.1]] },
-    { photo: "./panoramas/utility-block-v3-preview.webp", name: "Utility Block", alt: "Residential block with a curbside drain grate, a round roadway cover, a power distribution pole, and a Telco handhole.",
+    { photo: "./datos/utility-block-preview-hq.webp", name: "Utility Block", alt: "Residential block with a curbside drain grate, a round roadway cover, a power distribution pole, and a Telco handhole.",
       initialLookX: -38, initialLookY: -22,
       assets: [["grate", 18.33, 82.07], ["roundCover", 44.16, 75.61], ["distribution", 72.11, 25.04], ["telcoCover", 86.96, 77.26]] },
   ];
-  const panoramas = ["principal", "tramo", "interseccion", "lateral", "utility-block-hd"];
+  const panoramas = ["principal-hq", "tramo-hq", "interseccion-hq", "lateral-hq", "utility-block-hq"];
   const panoramaAssets = [
     [["drain", 73, 77], ["cover", 80.5, 72], ["light", 58.6, 45]],
     [["light", 73.7, 64.3]],

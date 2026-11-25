@@ -41,7 +41,6 @@ function createPanoramaGraphics(gl) {
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
   const spread = gl.getUniformLocation(program, "spread");
@@ -59,6 +58,11 @@ function createPanoramaGraphics(gl) {
         context.imageSmoothingQuality = "high";
         context.drawImage(image, 0, 0, source.width, source.height);
       }
+      // WebGL 1 requires clamp-to-edge for textures whose dimensions aren't powers of two.
+      const width = source.naturalWidth ?? source.width;
+      const height = source.naturalHeight ?? source.height;
+      const powerOfTwo = (width & (width - 1)) === 0 && (height & (height - 1)) === 0;
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, powerOfTwo ? gl.REPEAT : gl.CLAMP_TO_EDGE);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
     },
     draw(width, height, halfWidth, halfHeight, yaw, pitch) {
@@ -86,7 +90,9 @@ function createPanoramaSoftware(context) {
   let rayHalfWidth;
   let rayHalfHeight;
   return {
-    density: (width, height) => Math.min(1, 1120 / width, 650 / height),
+    density: (width, height, moving) => moving
+      ? Math.min(1, 900 / width, 520 / height)
+      : Math.min(1, 1440 / width, 800 / height),
     load(image) {
       const source = document.createElement("canvas");
       textureWidth = source.width = image.naturalWidth;
@@ -170,6 +176,7 @@ window.createStreetPanorama = function createStreetPanorama(canvas, pins, src, o
   let targetPitch = 0;
   let zoom = 1;
   let scheduled = 0;
+  let settleTimer = 0;
   const image = new Image();
 
   function draw() {
@@ -177,7 +184,7 @@ window.createStreetPanorama = function createStreetPanorama(canvas, pins, src, o
     if (!loaded || disposed) return;
     const width = canvas.clientWidth, height = canvas.clientHeight;
     if (!width || !height) return;
-    const density = renderer.density(width, height);
+    const density = renderer.density(width, height, settleTimer !== 0);
     const pixelWidth = Math.round(width * density), pixelHeight = Math.round(height * density);
     if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
       canvas.width = pixelWidth;
@@ -213,7 +220,15 @@ window.createStreetPanorama = function createStreetPanorama(canvas, pins, src, o
     yaw = (-x * .005) % (2 * Math.PI);
     targetPitch = y * .005;
     zoom = magnification;
-    if (loaded && !scheduled) scheduled = requestAnimationFrame(draw);
+    if (!loaded) return;
+    if (!gl) {
+      clearTimeout(settleTimer);
+      settleTimer = setTimeout(() => {
+        settleTimer = 0;
+        if (!scheduled) scheduled = requestAnimationFrame(draw);
+      }, 140);
+    }
+    if (!scheduled) scheduled = requestAnimationFrame(draw);
   }
   image.onload = () => {
     if (disposed) return;
@@ -235,6 +250,7 @@ window.createStreetPanorama = function createStreetPanorama(canvas, pins, src, o
     dispose() {
       disposed = true;
       cancelAnimationFrame(scheduled);
+      clearTimeout(settleTimer);
       renderer.dispose();
     },
   };
