@@ -43,13 +43,23 @@ function createPanoramaGraphics(gl) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
   const spread = gl.getUniformLocation(program, "spread");
   const turn = gl.getUniformLocation(program, "turn");
 
   return {
-    density: (width) => Math.min(window.devicePixelRatio || 1, 2, 1800 / width),
+    density: width => Math.min(window.devicePixelRatio || 1, 2, 2400 / width),
     load(image) {
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+      let source = image;
+      if (image.naturalWidth > maxTextureSize) {
+        source = document.createElement("canvas");
+        source.width = maxTextureSize;
+        source.height = maxTextureSize / 2;
+        const context = source.getContext("2d");
+        context.imageSmoothingQuality = "high";
+        context.drawImage(image, 0, 0, source.width, source.height);
+      }
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
     },
     draw(width, height, halfWidth, halfHeight, yaw, pitch) {
       gl.viewport(0, 0, width, height);
@@ -76,14 +86,14 @@ function createPanoramaSoftware(context) {
   let rayHalfWidth;
   let rayHalfHeight;
   return {
-    density: (width, height) => Math.min(1, 800 / width, 480 / height),
+    density: (width, height) => Math.min(1, 1120 / width, 650 / height),
     load(image) {
       const source = document.createElement("canvas");
       textureWidth = source.width = image.naturalWidth;
       textureHeight = source.height = image.naturalHeight;
       const sourceContext = source.getContext("2d", { willReadFrequently: true });
       sourceContext.drawImage(image, 0, 0);
-      texture = new Uint32Array(sourceContext.getImageData(0, 0, textureWidth, textureHeight).data.buffer);
+      texture = sourceContext.getImageData(0, 0, textureWidth, textureHeight).data;
     },
     draw(width, height, halfWidth, halfHeight, yaw, pitch) {
       const frameChanged = !frame || frame.width !== width || frame.height !== height;
@@ -106,18 +116,33 @@ function createPanoramaSoftware(context) {
           }
         }
       }
-      const result = new Uint32Array(frame.data.buffer);
+      const result = frame.data;
       const cp = Math.cos(pitch), sp = Math.sin(pitch);
       const longitudeScale = textureWidth / (2 * Math.PI);
       const latitudeScale = textureHeight / Math.PI;
-      const yawOffset = textureWidth / 2 + yaw * longitudeScale;
-      for (let j = 0, i = 0; j < result.length; j++, i += 3) {
+      const yawOffset = textureWidth / 2 + yaw * longitudeScale - .5;
+      for (let j = 0, i = 0; j < result.length; j += 4, i += 3) {
         const y = rays[i + 1], z = rays[i + 2];
         const longitude = Math.atan2(rays[i], cp * z - sp * y);
         const latitude = Math.asin(Math.max(-1, Math.min(1, cp * y + sp * z)));
-        const sx = ((Math.floor(yawOffset + longitude * longitudeScale) % textureWidth) + textureWidth) % textureWidth;
-        const sy = Math.min(textureHeight - 1, Math.floor(textureHeight / 2 - latitude * latitudeScale));
-        result[j] = texture[sy * textureWidth + sx];
+        const u = yawOffset + longitude * longitudeScale;
+        const v = Math.max(0, Math.min(textureHeight - 1, textureHeight / 2 - latitude * latitudeScale - .5));
+        const floorU = Math.floor(u);
+        const left = ((floorU % textureWidth) + textureWidth) % textureWidth;
+        const right = (left + 1) % textureWidth;
+        const top = Math.floor(v);
+        const bottom = Math.min(top + 1, textureHeight - 1);
+        const xWeight = u - floorU, yWeight = v - top;
+        const topLeft = (top * textureWidth + left) * 4;
+        const topRight = (top * textureWidth + right) * 4;
+        const bottomLeft = (bottom * textureWidth + left) * 4;
+        const bottomRight = (bottom * textureWidth + right) * 4;
+        for (let channel = 0; channel < 3; channel++) {
+          const upper = texture[topLeft + channel] * (1 - xWeight) + texture[topRight + channel] * xWeight;
+          const lower = texture[bottomLeft + channel] * (1 - xWeight) + texture[bottomRight + channel] * xWeight;
+          result[j + channel] = upper * (1 - yWeight) + lower * yWeight;
+        }
+        result[j + 3] = 255;
       }
       context.putImageData(frame, 0, 0);
     },
