@@ -92,7 +92,6 @@ body { margin: 0; }
 .md-utility-top{display:flex;justify-content:space-between;gap:12px;align-items:center}
 .md-utility-badge{padding:3px 8px;border-radius:6px;background:var(--utility-color);color:#fff;font-size:.8rem;font-weight:800}
 .md-utility-close{min-width:44px;min-height:44px;border:1px solid #aac0d2;border-radius:8px;background:#fff;color:#0b2545;font-size:1.4rem!important}
-.md-street-camera[data-point="2"] .md-street-arrow{left:67%;bottom:38%}
 @media(max-width:600px){.md-street-world{width:max(128cqw,185cqh)}}
 .md-pano-layer{position:absolute;inset:0;z-index:1}
 .md-pano-layer canvas{display:block;width:100%;height:100%}
@@ -259,14 +258,14 @@ const stops = [
       assets: [["drain", 44, 86], ["cover", 71, 82], ["light", 38, 43]] },
     { photo: "./datos/vista-media-hq.webp", name: "Main Street", alt: "Midblock view on the main street next to the streetlight pole.",
       assets: [["light", 79, 83]] },
-    { photo: "./datos/vista-cruce-hq.webp", name: "Intersection", nextIsTurn: true, alt: "Intersection with a residential side street on the right.", assets: [] },
-    { photo: "./datos/vista-lateral-hq.webp", name: "Side Street", alt: "Side street with a fire hydrant, sanitary sewer manhole, transformer, and telco pedestal.",
+    { photo: "./datos/vista-continua-hq.webp", name: "Main Street", alt: "A continuous residential street with sidewalks and trees on both sides.", assets: [] },
+    { photo: "./datos/vista-lateral-hq.webp", name: "Residential Block", alt: "Residential block with a fire hydrant, sanitary sewer manhole, transformer, and telco pedestal.",
       assets: [["hydrant", 19.3, 51.7], ["sewer", 47.8, 73.5], ["transformer", 70.8, 45.4], ["telecom", 80.5, 56.1]] },
     { photo: "./datos/utility-block-preview-hq.webp", name: "Utility Block", alt: "Residential block with a curbside drain grate, a round roadway cover, a power distribution pole, and a Telco handhole.",
       initialLookX: -38, initialLookY: -22,
       assets: [["grate", 18.33, 82.07], ["roundCover", 44.16, 75.61], ["distribution", 72.11, 25.04], ["telcoCover", 86.96, 77.26]] },
   ];
-  const panoramas = ["principal-hq", "tramo-hq", "interseccion-hq", "lateral-hq", "utility-block-single"];
+  const panoramas = ["principal-hq", "tramo-hq", "main-street-continuation", "lateral-hq", "utility-block-single"];
   const panoramaAssets = [
     [["drain", 73, 77], ["cover", 80.5, 72], ["light", 58.6, 45]],
     [["light", 73.7, 64.3]],
@@ -329,7 +328,6 @@ const stops = [
     const current = viewpoints[state.viewpoint];
     const first = state.viewpoint === 0;
     const last = state.viewpoint === viewpoints.length - 1;
-    const turning = current.nextIsTurn;
     const pins = current.assets.map(([id, x, y]) => {
       const asset = utilities[id];
       return `<button type="button" class="md-utility-pin" style="left:${x}%;top:${y}%;--utility-color:${asset.color}"
@@ -358,7 +356,7 @@ const stops = [
             <canvas role="img" aria-label="${escapeHtml("360-degree panorama. " + current.alt)}"></canvas>${panoramaPins}
           </div>
           ${last ? "" : `<button class="md-street-arrow" type="button" data-move="1"
-            aria-label="${turning ? "Turn Right" : "Advance Along Street"}">${turning ? "↱" : "↑"}</button>`}
+            aria-label="Advance Along Street">↑</button>`}
           <div class="md-zoom" role="group" aria-label="Panorama Zoom">
             <button type="button" data-zoom-step="-1" aria-label="Zoom Out">−</button>
             <output aria-label="Zoom Level" aria-live="off"></output>
@@ -369,7 +367,7 @@ const stops = [
         <div class="md-street-bar">
           <button class="md-secondary" type="button" data-move="-1" ${first ? "disabled" : ""}>← Previous</button>
           <span class="md-street-index" id="md-street-point" role="status">Viewpoint ${state.viewpoint + 1} of ${viewpoints.length} · ${escapeHtml(current.name)}</span>
-          <button class="md-secondary" type="button" data-move="1" ${last ? "disabled" : ""}>${turning ? "Turn Right ↱" : "Next →"}</button>
+          <button class="md-secondary" type="button" data-move="1" ${last ? "disabled" : ""}>Next →</button>
           <button class="md-secondary" type="button" data-center>Reset View</button>
         </div>
         <div class="md-street-tools">
