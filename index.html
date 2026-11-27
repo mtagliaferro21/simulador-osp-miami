@@ -114,7 +114,8 @@ body { margin: 0; }
 .md-results dd{margin:0 0 7px;color:#315169}
 .md-street-camera[data-point="4"] .md-street-world{width:min(100cqw,177.777cqh)}
 </style>
-<script src="./panorama.js?v=5" defer></script>
+<script src="./photo-details.js?v=20261127-photo" defer></script>
+<script src="./panorama.js?v=20261127-photo" defer></script>
 </head>
 <body>
 <main id="recorrido" class="md-simulator">
@@ -146,7 +147,7 @@ window.addEventListener("DOMContentLoaded", startSimulator);
 function startSimulator() {
 // Edita las preguntas, opciones y explicaciones en este bloque.
 const brand = "./datos/fiberlog.png";
-const street = "./datos/foto-2-hq.webp";
+const street = "./photos/overview.webp";
 
 const stops = [
   {
@@ -520,7 +521,8 @@ const stops = [
     try {
       panorama = window.createStreetPanorama?.(layer.querySelector("canvas"),
         Array.from(layer.querySelectorAll("[data-photo-x]")),
-        `./panoramas/${panoramas[state.viewpoint]}.webp`, onReady);
+        `./panoramas/${panoramas[state.viewpoint]}.webp`, onReady,
+        window.streetPhotoDetails?.[state.viewpoint] ?? []);
     } catch (error) {
       console.warn("Panoramic viewer unavailable", error);
     }

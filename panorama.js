@@ -8,7 +8,24 @@ function createPanoramaGraphics(gl) {
     uniform sampler2D photo;
     uniform vec2 spread;
     uniform vec2 turn;
+    uniform sampler2D detail0;
+    uniform sampler2D detail1;
+    uniform sampler2D detail2;
+    uniform sampler2D detail3;
+    uniform sampler2D detail4;
+    uniform vec4 detailCamera[5];
+    uniform float detailReady[5];
     const float PI = 3.141592653589793;
+    vec4 projectDetail(vec3 v, vec4 camera) {
+      float cy = cos(camera.x), sy = sin(camera.x);
+      float cp = cos(camera.y), sp = sin(camera.y);
+      float forward = sy*v.x+cy*v.z;
+      float depth = sp*v.y+cp*forward;
+      vec2 q = vec2(cy*v.x-sy*v.z, sp*forward-cp*v.y) / max(depth, .00001);
+      q /= camera.zw;
+      vec2 edge = smoothstep(vec2(0.), vec2(.18), vec2(1.)-abs(q));
+      return vec4(q*.5+.5, edge.x*edge.y*step(.00001,depth), 1.);
+    }
     void main(){
       vec3 v = normalize(vec3(uv * spread, 1.0));
       float c = cos(turn.y), s = sin(turn.y);
@@ -16,7 +33,21 @@ function createPanoramaGraphics(gl) {
       c = cos(turn.x); s = sin(turn.x);
       v = vec3(c*v.x+s*v.z, v.y, c*v.z-s*v.x);
       vec2 st = vec2(fract(.5+atan(v.x,v.z)/(2.0*PI)), .5-asin(clamp(v.y,-1.0,1.0))/PI);
-      gl_FragColor = texture2D(photo, st);
+      vec3 base = texture2D(photo, st).rgb;
+      float luminance = dot(base, vec3(.2126,.7152,.0722));
+      // Neutral exposure in the retained peripheral imagery; never sharpen halos.
+      vec4 color = vec4((mix(vec3(luminance),base,.83)-.5)*.96+.5,1.);
+      vec4 d = projectDetail(v, detailCamera[0]);
+      color = mix(color, texture2D(detail0,d.xy), d.z*detailReady[0]);
+      d = projectDetail(v, detailCamera[1]);
+      color = mix(color, texture2D(detail1,d.xy), d.z*detailReady[1]);
+      d = projectDetail(v, detailCamera[2]);
+      color = mix(color, texture2D(detail2,d.xy), d.z*detailReady[2]);
+      d = projectDetail(v, detailCamera[3]);
+      color = mix(color, texture2D(detail3,d.xy), d.z*detailReady[3]);
+      d = projectDetail(v, detailCamera[4]);
+      color = mix(color, texture2D(detail4,d.xy), d.z*detailReady[4]);
+      gl_FragColor = vec4(color.rgb, 1.);
     }`;
   function compile(type, source) {
     const shader = gl.createShader(type);
@@ -45,10 +76,35 @@ function createPanoramaGraphics(gl) {
   const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
   const spread = gl.getUniformLocation(program, "spread");
   const turn = gl.getUniformLocation(program, "turn");
+  const detailTextures = [];
+  const detailCameras = gl.getUniformLocation(program, "detailCamera[0]");
+  const detailReady = gl.getUniformLocation(program, "detailReady[0]");
+  const cameraValues = new Float32Array(20);
+  const readyValues = new Float32Array(5);
+  for (let i = 0; i < 5; i++) {
+    cameraValues.set([0,0,1,1], i*4);
+    gl.activeTexture(gl.TEXTURE0+i+1);
+    const tile = gl.createTexture();
+    detailTextures.push(tile);
+    gl.bindTexture(gl.TEXTURE_2D,tile);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,255]));
+    gl.uniform1i(gl.getUniformLocation(program,`detail${i}`),i+1);
+  }
+  gl.uniform4fv(detailCameras,cameraValues);
+  gl.uniform1fv(detailReady,readyValues);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D,texture);
+  gl.uniform1i(gl.getUniformLocation(program,"photo"),0);
 
   return {
-    density: width => Math.min(window.devicePixelRatio || 1, 2, 2400 / width),
+    density: (width,height) => Math.min(window.devicePixelRatio || 1, 2, 3840 / width, Math.sqrt(6000000/(width*height))),
     load(image) {
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D,texture);
       let source = image;
       if (image.naturalWidth > maxTextureSize) {
         source = document.createElement("canvas");
@@ -65,6 +121,18 @@ function createPanoramaGraphics(gl) {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, powerOfTwo ? gl.REPEAT : gl.CLAMP_TO_EDGE);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
     },
+    loadDetail(image, spec, index) {
+      if (index >= detailTextures.length || image.naturalWidth > maxTextureSize || image.naturalHeight > maxTextureSize) return;
+      gl.activeTexture(gl.TEXTURE0+index+1);
+      gl.bindTexture(gl.TEXTURE_2D,detailTextures[index]);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);
+      const halfWidth = Math.tan(spec.angle*Math.PI/180);
+      cameraValues.set([spec.yaw*Math.PI/180,spec.pitch*Math.PI/180,halfWidth,halfWidth*image.naturalHeight/image.naturalWidth],index*4);
+      readyValues[index] = 1;
+      gl.uniform4fv(detailCameras,cameraValues);
+      gl.uniform1fv(detailReady,readyValues);
+      gl.activeTexture(gl.TEXTURE0);
+    },
     draw(width, height, halfWidth, halfHeight, yaw, pitch) {
       gl.viewport(0, 0, width, height);
       gl.uniform2f(spread, halfWidth, halfHeight);
@@ -73,6 +141,7 @@ function createPanoramaGraphics(gl) {
     },
     dispose() {
       gl.deleteTexture(texture);
+      detailTextures.forEach(tile => gl.deleteTexture(tile));
       gl.deleteBuffer(buffer);
       shaders.forEach(shader => gl.deleteShader(shader));
       gl.deleteProgram(program);
@@ -82,6 +151,7 @@ function createPanoramaGraphics(gl) {
 }
 
 function createPanoramaSoftware(context) {
+  const details = [];
   let texture;
   let textureWidth;
   let textureHeight;
@@ -100,6 +170,18 @@ function createPanoramaSoftware(context) {
       const sourceContext = source.getContext("2d", { willReadFrequently: true });
       sourceContext.drawImage(image, 0, 0);
       texture = sourceContext.getImageData(0, 0, textureWidth, textureHeight).data;
+    },
+    loadDetail(image, spec, index) {
+      const source = document.createElement("canvas");
+      source.width = image.naturalWidth;
+      source.height = image.naturalHeight;
+      const ctx = source.getContext("2d", {willReadFrequently: true});
+      ctx.drawImage(image,0,0);
+      const yaw = spec.yaw*Math.PI/180, pitch = spec.pitch*Math.PI/180;
+      details[index] = {data:ctx.getImageData(0,0,source.width,source.height).data,
+        width:source.width,height:source.height, cy:Math.cos(yaw),sy:Math.sin(yaw),
+        cp:Math.cos(pitch),sp:Math.sin(pitch),sx:Math.tan(spec.angle*Math.PI/180),
+        sz:Math.tan(spec.angle*Math.PI/180)*source.height/source.width};
     },
     draw(width, height, halfWidth, halfHeight, yaw, pitch) {
       const frameChanged = !frame || frame.width !== width || frame.height !== height;
@@ -124,6 +206,7 @@ function createPanoramaSoftware(context) {
       }
       const result = frame.data;
       const cp = Math.cos(pitch), sp = Math.sin(pitch);
+      const cy = Math.cos(yaw), sy = Math.sin(yaw);
       const longitudeScale = textureWidth / (2 * Math.PI);
       const latitudeScale = textureHeight / Math.PI;
       const yawOffset = textureWidth / 2 + yaw * longitudeScale - .5;
@@ -148,15 +231,37 @@ function createPanoramaSoftware(context) {
           const lower = texture[bottomLeft + channel] * (1 - xWeight) + texture[bottomRight + channel] * xWeight;
           result[j + channel] = upper * (1 - yWeight) + lower * yWeight;
         }
+        const luminance = result[j]*.2126+result[j+1]*.7152+result[j+2]*.0722;
+        for(let channel=0;channel<3;channel++) result[j+channel] = (luminance*.17+result[j+channel]*.83-127.5)*.96+127.5;
+        const vz=cp*z-sp*y, worldX=cy*rays[i]+sy*vz, worldY=cp*y+sp*z, worldZ=cy*vz-sy*rays[i];
+        for (const tile of details) {
+          if (!tile) continue;
+          const forward=tile.sy*worldX+tile.cy*worldZ, depth=tile.sp*worldY+tile.cp*forward;
+          if(depth<=0) continue;
+          const qx=(tile.cy*worldX-tile.sy*worldZ)/(depth*tile.sx);
+          const qy=(tile.sp*forward-tile.cp*worldY)/(depth*tile.sz);
+          if(Math.abs(qx)>=1 || Math.abs(qy)>=1) continue;
+          const ex=Math.min(1,(1-Math.abs(qx))/.18), ey=Math.min(1,(1-Math.abs(qy))/.18);
+          const alpha=ex*ex*(3-2*ex)*ey*ey*(3-2*ey);
+          const tx=Math.max(0,Math.min(tile.width-1,(qx*.5+.5)*tile.width-.5));
+          const ty=Math.max(0,Math.min(tile.height-1,(qy*.5+.5)*tile.height-.5));
+          const ix=Math.floor(tx),iy=Math.floor(ty),fx=tx-ix,fy=ty-iy;
+          const a=(iy*tile.width+ix)*4,b=(iy*tile.width+Math.min(ix+1,tile.width-1))*4;
+          const c=(Math.min(iy+1,tile.height-1)*tile.width+ix)*4,d=(Math.min(iy+1,tile.height-1)*tile.width+Math.min(ix+1,tile.width-1))*4;
+          for(let channel=0;channel<3;channel++) {
+            const value=(tile.data[a+channel]*(1-fx)+tile.data[b+channel]*fx)*(1-fy)+(tile.data[c+channel]*(1-fx)+tile.data[d+channel]*fx)*fy;
+            result[j+channel]=result[j+channel]*(1-alpha)+value*alpha;
+          }
+        }
         result[j + 3] = 255;
       }
       context.putImageData(frame, 0, 0);
     },
-    dispose() { texture = null; frame = null; rays = null; },
+    dispose() { texture = null; frame = null; rays = null; details.length = 0; },
   };
 }
 
-window.createStreetPanorama = function createStreetPanorama(canvas, pins, src, onReady) {
+window.createStreetPanorama = function createStreetPanorama(canvas, pins, src, onReady, details = []) {
   const gl = canvas.getContext("webgl", { alpha: false, antialias: false });
   const context = gl ? null : canvas.getContext("2d", { alpha: false });
   const renderer = gl ? createPanoramaGraphics(gl) : context ? createPanoramaSoftware(context) : null;
@@ -178,6 +283,7 @@ window.createStreetPanorama = function createStreetPanorama(canvas, pins, src, o
   let scheduled = 0;
   let settleTimer = 0;
   const image = new Image();
+  const detailImages = [];
 
   function draw() {
     scheduled = 0;
@@ -237,6 +343,20 @@ window.createStreetPanorama = function createStreetPanorama(canvas, pins, src, o
       loaded = true;
       onReady(true);
       draw();
+      // Independent rectilinear detail textures retain their native samples.
+      // A failed optional tile leaves the complete 360-degree panorama available.
+      if (renderer.loadDetail) details.slice(0,5).forEach((spec,index) => {
+        const tile = new Image();
+        detailImages.push(tile);
+        tile.onload = () => {
+          if (disposed) return;
+          try {
+            renderer.loadDetail(tile,spec,index);
+            if (!scheduled) scheduled = requestAnimationFrame(draw);
+          } catch (error) { console.warn("Detail image unavailable",spec.src,error); }
+        };
+        tile.src = spec.src;
+      });
     } catch (error) {
       console.warn("No se pudo preparar el panorama", error);
       onReady(false);
@@ -251,6 +371,8 @@ window.createStreetPanorama = function createStreetPanorama(canvas, pins, src, o
       disposed = true;
       cancelAnimationFrame(scheduled);
       clearTimeout(settleTimer);
+      image.onload = image.onerror = null;
+      detailImages.forEach(tile => { tile.onload = tile.onerror = null; tile.src = ""; });
       renderer.dispose();
     },
   };
