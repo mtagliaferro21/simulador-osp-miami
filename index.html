@@ -113,7 +113,24 @@ body { margin: 0; }
 .md-results dt{font-weight:750}
 .md-results dd{margin:0 0 7px;color:#315169}
 .md-street-camera[data-point="4"] .md-street-world{width:min(100cqw,177.777cqh)}
+.md-tracking{padding:6px 16px;text-align:center;background:#e8f1f7;color:#315169;font-size:.78rem}
+.md-tracking[data-error="true"]{background:#fff1d6;color:#6b4000}
+.md-tracking button{margin-left:10px;min-height:32px;border:1px solid currentColor;border-radius:6px;background:white;color:inherit}
+.md-attempts{font-size:.85rem;color:#315169;margin:12px 0!important}
+.md-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px 0}
+.md-metric{background:white;border:1px solid #d5e3ee;border-radius:12px;padding:14px}
+.md-metric strong{display:block;font-size:1.6rem;color:#0b2545}
+.md-metric span{font-size:.85rem;color:#315169}
+.md-report-table{overflow:auto;background:white;border:1px solid #d5e3ee;border-radius:12px;margin:16px 0}
+.md-report-table table{border-collapse:collapse;width:100%;text-align:left;font-size:.9rem}
+.md-report-table th,.md-report-table td{padding:12px;border-bottom:1px solid #d5e3ee;white-space:nowrap}
+.md-report-table thead{background:#e8f1f7}
+.md-report-table caption{text-align:left;padding:12px;font-weight:700}
+.md-report-table tfoot{font-weight:700}
+@media(max-width:650px){.md-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
+<script src="./tracking-config.js?v=20261127-tracking" defer></script>
+<script src="./tracking.js?v=20261127-tracking" defer></script>
 <script src="./photo-details.js?v=20261127-photo" defer></script>
 <script src="./panorama.js?v=20261127-photo" defer></script>
 </head>
@@ -124,6 +141,7 @@ body { margin: 0; }
     <span>OSP Visual Inspection</span>
     <span class="md-progress" role="status"></span>
   </header>
+  <div class="md-tracking" role="status" aria-live="polite"></div>
   <section class="md-content"></section>
   <dialog class="md-utility-dialog" aria-labelledby="md-utility-title"></dialog>
   <noscript>Enable JavaScript to open the inspection route.</noscript>
@@ -277,8 +295,12 @@ const stops = [
   let panorama;
   const minZoom = .9;
   const maxZoom = 2.4;
+  const tracker = window.createOSPTracking(stops, window.OSP_TRACKING_CONFIG || {});
+  const resumed = tracker.snapshot();
   const state = {
-    view: "overview", active: 0, selected: null, answers: {},
+    view: "overview", active: 0, selected: null,
+    answers: Object.fromEntries(stops.flatMap((stop, i) => resumed.rows[i].n ? [[stop.id, resumed.rows[i].last]] : [])),
+    retrying: false, questionStarted: Date.now(),
     viewpoint: 0, lookX: 0, lookY: 0, zoom: 1, backTo: "overview", streetPanel: "assets",
   };
   let drag = null;
@@ -297,9 +319,7 @@ const stops = [
   }
 
   function summaryButton() {
-    return Object.keys(state.answers).length === stops.length
-      ? '<button type="button" class="md-primary" data-view="summary">View Inspection Summary</button>'
-      : "";
+    return '<button type="button" class="md-secondary" data-view="summary">View Results</button>';
   }
 
   function overview() {
@@ -458,7 +478,10 @@ const stops = [
 
   function stopView(stop) {
     const answer = state.answers[stop.id];
-    const answered = answer !== undefined;
+    const answered = answer !== undefined && !state.retrying;
+    const tracking = tracker.snapshot();
+    const locked = tracking.blocked || tracking.readonly || tracking.pending || !!tracking.error || tracking.finished;
+    const row = tracking.rows[state.active];
     const choices = stop.choices.map((choice, index) => `
       <label class="md-choice">
         <input type="radio" name="answer" value="${index}" ${(answered ? answer : state.selected) === index ? "checked" : ""}>
@@ -469,7 +492,10 @@ const stops = [
         <strong>${answer === stop.correct ? "Correct Answer" : "Review the Required Evidence"}</strong>
         <p>${escapeHtml(stop.feedback)}</p>
       </div>
-      <button type="button" class="md-primary" data-next>${Object.keys(state.answers).length === stops.length ? "View Inspection Summary" : "Next Unanswered Stop"}</button>` : "";
+      <div class="md-actions">
+        <button type="button" class="md-secondary" data-try-again ${locked ? "disabled" : ""}>Try Again</button>
+        <button type="button" class="md-primary" data-next>${Object.keys(state.answers).length === stops.length ? "View Inspection Summary" : "Next Unanswered Stop"}</button>
+      </div>` : "";
     return `<button type="button" class="md-back" data-view="${state.backTo}">${state.backTo === "street" ? "← Back to Street View" : "← Overview"}</button>
       <h1 tabindex="-1">${escapeHtml(stop.id + " · " + stop.title)}</h1>
       <div class="md-grid">
@@ -477,29 +503,48 @@ const stops = [
         <div class="md-panel">
           <p>${escapeHtml(stop.observation)}</p>
           <form>
-            <fieldset ${answered ? "disabled" : ""}>
+            <fieldset ${answered || locked ? "disabled" : ""}>
               <legend>${escapeHtml(stop.question)}</legend>
               ${choices}
             </fieldset>
             ${answered ? "" : '<button type="submit" class="md-primary" disabled>Check Answer</button>'}
           </form>
           ${feedback}
+          <p class="md-attempts">Attempts: <strong>${row.n}</strong> · Correct: <strong>${row.c}</strong> · Incorrect: <strong>${row.w}</strong></p>
+          <p class="md-attempts">Unlimited practice. Every submitted answer is recorded; retrying does not erase earlier answers.</p>
         </div>
       </div>`;
   }
 
   function summary() {
-    const score = stops.filter(stop => state.answers[stop.id] === stop.correct).length;
+    const tracking = tracker.snapshot();
+    const totals = tracking.rows.reduce((sum, r) => ({ n: sum.n + r.n, c: sum.c + r.c, w: sum.w + r.w }), { n: 0, c: 0, w: 0 });
+    const result = (choice, correct) => choice === null ? "Unanswered" : choice === correct ? "Correct" : "Incorrect";
+    const rows = stops.map((stop, i) => {
+      const r = tracking.rows[i];
+      return `<tr><th scope="row">${escapeHtml(stop.id + " · " + stop.title)}</th><td>${r.n}</td><td>${r.c}</td><td>${r.w}</td><td>${result(r.first, stop.correct)}</td><td>${result(r.last, stop.correct)}</td></tr>`;
+    }).join("");
     const results = stops.map(stop => `<li><strong>${escapeHtml(stop.id + " · " + stop.title)}</strong>
       <dl><dt>Observed in the field</dt><dd>${escapeHtml(stop.observation)}</dd>
         <dt>Requires verification</dt><dd>${escapeHtml(stop.verification)}</dd>
         <dt>Next action</dt><dd>${escapeHtml(stop.action)}</dd></dl></li>`).join("");
-    return `<h1 tabindex="-1">Inspection Findings</h1>
-      <p>Correct answers: ${score} of ${stops.length}.</p>
+    return `<h1 tabindex="-1">Inspection Results</h1>
+      <p>${tracking.learner.name ? escapeHtml(tracking.learner.name) + " · " : ""}${tracking.answered} of ${stops.length} questions answered. ${tracking.answered === stops.length ? "Practice completed." : "Practice in progress."}</p>
+      <div class="md-metrics">
+        <div class="md-metric"><strong>${tracking.first}%</strong><span>First-answer score</span></div>
+        <div class="md-metric"><strong>${tracking.latest}%</strong><span>Latest-answer score</span></div>
+        <div class="md-metric"><strong>${totals.c}</strong><span>Correct submissions</span></div>
+        <div class="md-metric"><strong>${totals.w}</strong><span>Incorrect submissions</span></div>
+      </div>
+      <p>The LMS score uses each question’s first answer. Unanswered questions count as zero. Later attempts show learning progress and do not replace the first score.</p>
+      <div class="md-report-table"><table><caption>Response totals by inspection stop</caption><thead><tr><th scope="col">Inspection stop</th><th scope="col">Attempts</th><th scope="col">Correct</th><th scope="col">Incorrect</th><th scope="col">First answer</th><th scope="col">Latest answer</th></tr></thead>
+        <tbody>${rows}</tbody><tfoot><tr><th scope="row">Total submissions</th><td>${totals.n}</td><td>${totals.c}</td><td>${totals.w}</td><td colspan="2"></td></tr></tfoot></table></div>
+      <div class="md-actions"><button type="button" class="md-primary" data-export>Download Results CSV</button></div>
+      <h2>Inspection Findings</h2>
       <ul class="md-results">${results}</ul>
       <div class="md-actions">
         <button type="button" class="md-secondary" data-view="overview">Back to Overview</button>
-        <button type="button" class="md-primary" data-restart>Restart Route</button>
+        <button type="button" class="md-primary" data-restart>Review Route</button>
       </div>`;
   }
 
@@ -538,12 +583,23 @@ const stops = [
     root.dataset.view = content.dataset.view = state.view;
     content.innerHTML = views[state.view](stop);
     root.querySelector(".md-progress").textContent = `${Object.keys(state.answers).length} of ${stops.length} stops answered`;
+    updateTrackingStatus();
     if (state.view === "street") {
       mountPanorama();
       updateZoomControls(root.querySelector(".md-street-camera"));
       setLook(state.lookX, state.lookY);
     }
     if (focusSelector) root.querySelector(focusSelector)?.focus({ preventScroll: state.view === "street" });
+  }
+
+  function updateTrackingStatus() {
+    const t = tracker.snapshot();
+    const status = root.querySelector(".md-tracking");
+    status.dataset.error = String(!!t.error);
+    const message = t.error || (t.readonly ? "Review mode · Results are read-only." : t.finished ? "Tracking session closed. Reopen the activity from your course to continue." : t.mode === "lms" ?
+      "TalentLMS tracking active · " + (t.saved ? "Results saved." : "Ready to record answers.") :
+      "Anonymous practice · Results stay in this browser tab when storage is available. Open the SCORM activity in TalentLMS for instructor reporting.");
+    status.innerHTML = escapeHtml(message) + (t.error && !t.blocked ? '<button type="button" data-retry-save>Retry Saving</button>' : "");
   }
 
   function navigate(view) {
@@ -558,6 +614,8 @@ const stops = [
     if (state.view === "street" || state.view === "overview") state.backTo = state.view;
     state.active = index;
     state.selected = null;
+    state.retrying = false;
+    state.questionStarted = Date.now();
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       navigate("stop");
       return;
@@ -592,8 +650,23 @@ const stops = [
       setZoom(state.zoom * (1.15 ** Number(button.dataset.zoomStep)));
     } else if ("center" in button.dataset) {
       resetView();
+    } else if ("tryAgain" in button.dataset) {
+      const t = tracker.snapshot();
+      if (t.blocked || t.readonly || t.pending || t.error || t.finished) return;
+      state.retrying = true;
+      state.selected = null;
+      state.questionStarted = Date.now();
+      render("legend");
+    } else if ("retrySave" in button.dataset) {
+      tracker.save();
+      render();
+    } else if ("export" in button.dataset) {
+      const url = URL.createObjectURL(new Blob([tracker.csv()], { type: "text/csv;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = url; link.download = "Fiberlog_OSP_Results.csv";
+      link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     } else if ("restart" in button.dataset) {
-      state.answers = {};
+      state.retrying = false;
       state.streetPanel = "assets";
       state.viewpoint = 0;
       state.lookX = 0;
@@ -680,6 +753,8 @@ const stops = [
 
   root.addEventListener("change", event => {
     if (event.target.name !== "answer") return;
+    const t = tracker.snapshot();
+    if (t.blocked || t.readonly || t.pending || t.error || t.finished) return;
     state.selected = Number(event.target.value);
     root.querySelector('button[type="submit"]').disabled = false;
   });
@@ -687,9 +762,28 @@ const stops = [
   root.addEventListener("submit", event => {
     event.preventDefault();
     const stop = stops[state.active];
-    if (state.selected === null || stop.id in state.answers) return;
-    state.answers[stop.id] = state.selected;
+    if (state.selected === null || (stop.id in state.answers && !state.retrying)) return;
+    if (tracker.record(state.active, state.selected, Date.now() - state.questionStarted)) {
+      state.answers[stop.id] = state.selected;
+      state.retrying = false;
+      state.selected = null;
+    }
     render(".md-feedback");
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") tracker.save();
+    else updateTrackingStatus();
+  });
+  window.addEventListener("pagehide", event => {
+    if (event.persisted) tracker.save();
+    else tracker.finish();
+  });
+  window.addEventListener("beforeunload", event => {
+    const t = tracker.snapshot();
+    if (t.mode === "lms" && (t.pending || t.error) && !t.blocked) {
+      event.preventDefault(); event.returnValue = "";
+    }
   });
 
   render();
